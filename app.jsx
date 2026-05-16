@@ -175,10 +175,15 @@ function createEmptyItem(columns) {
       item[column.id] = "";
       return item;
     },
-    { id: crypto.randomUUID(), sessions: createEmptySessions() }
+    { id: crypto.randomUUID(), sessions: createEmptySessions(), transportDetails: createEmptyTransport() }
   );
   item.sessions = createEmptySessions();
+  item.transportDetails = createEmptyTransport();
   return item;
+}
+
+function createEmptyTransport() {
+  return { from: "", to: "", type: "", time: "", cost: "" };
 }
 
 function createEmptySessions() {
@@ -191,11 +196,25 @@ function createEmptySessions() {
 function normalizeItem(item) {
   return {
     ...item,
+    transportDetails: {
+      ...createEmptyTransport(),
+      ...(item.transportDetails || {})
+    },
     sessions: {
       ...createEmptySessions(),
       ...(item.sessions || {})
     }
   };
+}
+
+function formatTransport(item) {
+  const details = { ...createEmptyTransport(), ...(item.transportDetails || {}) };
+  const hasDetails = Object.values(details).some(Boolean);
+  if (!hasDetails) return item.transport || "";
+
+  const route = [details.from, details.to].filter(Boolean).join(" to ");
+  const meta = [details.type, details.time, details.cost].filter(Boolean).join(" ");
+  return [route, meta].filter(Boolean).join(", ");
 }
 
 function readSavedState() {
@@ -289,7 +308,7 @@ function buildCsv(columns, items) {
       sessions.evening.plan,
       sessions.night.time,
       sessions.night.plan,
-      item.transport,
+      formatTransport(item),
       item.distance,
       item.cost,
       item.notes,
@@ -648,6 +667,7 @@ function App() {
             night: { time: cell("night time"), plan: cell("night plan") }
           },
           transport: cell("transport"),
+          transportDetails: createEmptyTransport(),
           distance: cell("distance"),
           cost: cell("cost"),
           notes: cell("notes")
@@ -896,7 +916,11 @@ function ItineraryCards({ columns, items, isEditMode, onEdit, onDelete }) {
             {columns
               .filter((column) => !["date", "place"].includes(column.id))
               .map((column) => (
-                <FieldDisplay key={column.id} label={column.label} value={item[column.id]} />
+                column.id === "transport" ? (
+                  <TransportDisplay key={column.id} item={item} />
+                ) : (
+                  <FieldDisplay key={column.id} label={column.label} value={item[column.id]} />
+                )
               ))}
           </div>
 
@@ -944,9 +968,13 @@ function ItineraryTable({ columns, items, isEditMode, onEdit, onDelete, onRemove
               <tr key={item.id} className="align-top odd:bg-white even:bg-slate-50">
                 {columns.map((column) => (
                   <td key={column.id} className="border-b border-slate-200 px-4 py-4">
-                    <span className={column.id === "notes" ? "block max-w-md leading-relaxed" : "font-semibold"}>
-                      {item[column.id] || "-"}
-                    </span>
+                    {column.id === "transport" ? (
+                      <span className="block max-w-sm font-semibold leading-relaxed">{formatTransport(item) || "-"}</span>
+                    ) : (
+                      <span className={column.id === "notes" ? "block max-w-md leading-relaxed" : "font-semibold"}>
+                        {item[column.id] || "-"}
+                      </span>
+                    )}
                   </td>
                 ))}
                 <td className="border-b border-slate-200 px-4 py-4">
@@ -1000,6 +1028,10 @@ function FieldDisplay({ label, value }) {
   );
 }
 
+function TransportDisplay({ item }) {
+  return <FieldDisplay label="Transport" value={formatTransport(item)} />;
+}
+
 function ItemEditor({ columns, item, onCancel, onSave }) {
   const [draft, setDraft] = useState(normalizeItem(item));
 
@@ -1017,6 +1049,17 @@ function ItemEditor({ columns, item, onCancel, onSave }) {
           ...((current.sessions || {})[sessionId] || { time: "", plan: "" }),
           [field]: value
         }
+      }
+    }));
+  }
+
+  function updateTransport(field, value) {
+    setDraft((current) => ({
+      ...current,
+      transportDetails: {
+        ...createEmptyTransport(),
+        ...(current.transportDetails || {}),
+        [field]: value
       }
     }));
   }
@@ -1039,7 +1082,7 @@ function ItemEditor({ columns, item, onCancel, onSave }) {
 
         <form className="grid gap-4" onSubmit={submit}>
           <div className="grid gap-4 sm:grid-cols-2">
-            {columns.map((column) => (
+            {columns.filter((column) => column.id !== "transport").map((column) => (
               <label key={column.id} className={`field-label ${column.type === "textarea" ? "sm:col-span-2" : ""}`}>
                 {column.label}
                 {column.type === "textarea" ? (
@@ -1058,6 +1101,65 @@ function ItemEditor({ columns, item, onCancel, onSave }) {
               </label>
             ))}
           </div>
+
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-4">
+              <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Transport</p>
+              <h3 className="text-xl font-black text-slate-950">Fill in the route details</h3>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+              <label className="field-label">
+                From
+                <input
+                  className="field-input"
+                  value={(draft.transportDetails || {}).from || ""}
+                  onChange={(event) => updateTransport("from", event.target.value)}
+                  placeholder="Airport"
+                />
+              </label>
+              <label className="field-label">
+                To
+                <input
+                  className="field-input"
+                  value={(draft.transportDetails || {}).to || ""}
+                  onChange={(event) => updateTransport("to", event.target.value)}
+                  placeholder="Hotel"
+                />
+              </label>
+              <label className="field-label">
+                Type
+                <input
+                  className="field-input"
+                  value={(draft.transportDetails || {}).type || ""}
+                  onChange={(event) => updateTransport("type", event.target.value)}
+                  placeholder="Bolt / Train"
+                />
+              </label>
+              <label className="field-label">
+                Time
+                <input
+                  className="field-input"
+                  value={(draft.transportDetails || {}).time || ""}
+                  onChange={(event) => updateTransport("time", event.target.value)}
+                  placeholder="40 mins"
+                />
+              </label>
+              <label className="field-label">
+                Cost
+                <input
+                  className="field-input"
+                  value={(draft.transportDetails || {}).cost || ""}
+                  onChange={(event) => updateTransport("cost", event.target.value)}
+                  placeholder="30 Euro"
+                />
+              </label>
+            </div>
+            {draft.transport && !Object.values(draft.transportDetails || {}).some(Boolean) && (
+              <p className="mt-3 text-sm font-semibold text-slate-500">
+                Current text: {draft.transport}
+              </p>
+            )}
+          </section>
 
           <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
             <div className="mb-4">

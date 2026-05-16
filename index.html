@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Travel Itinerary Planner</title>
+    <script src="./tailwind.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
+            },
+            boxShadow: {
+              soft: "0 20px 60px rgba(15, 23, 42, 0.10)"
+            }
+          }
+        }
+      };
+    </script>
+    <style>
+      html {
+        -webkit-text-size-adjust: 100%;
+      }
+
+      body {
+        min-height: 100vh;
+      }
+
+      .field-label {
+        color: rgb(71 85 105);
+        font-size: 0.875rem;
+        font-weight: 700;
+      }
+
+      .field-input {
+        width: 100%;
+        margin-top: 0.5rem;
+        border: 1px solid rgb(226 232 240);
+        border-radius: 0.5rem;
+        background: #ffffff;
+        padding: 0.75rem;
+        color: rgb(2 6 23);
+        font-size: 1rem;
+        outline: none;
+      }
+
+      .field-input:focus {
+        border-color: rgb(13 148 136);
+        box-shadow: 0 0 0 4px rgb(204 251 241);
+      }
+
+      .btn-primary,
+      .btn-soft,
+      .btn-danger {
+        border-radius: 0.5rem;
+        padding: 0.75rem 1rem;
+        font-size: 1rem;
+        font-weight: 800;
+        transition: background 0.15s ease, border-color 0.15s ease;
+      }
+
+      .btn-primary {
+        background: rgb(15 118 110);
+        color: #ffffff;
+      }
+
+      .btn-primary:hover {
+        background: rgb(17 94 89);
+      }
+
+      .btn-soft {
+        border: 1px solid rgb(226 232 240);
+        background: #ffffff;
+        color: rgb(30 41 59);
+      }
+
+      .btn-soft:hover {
+        background: rgb(248 250 252);
+      }
+
+      .btn-danger {
+        background: rgb(225 29 72);
+        color: #ffffff;
+      }
+
+      .btn-danger:hover {
+        background: rgb(190 18 60);
+      }
+    </style>
+  </head>
+  <body class="bg-stone-50 text-slate-950">
+    <div id="root"></div>
+    <script src="./react.development.js"></script>
+    <script src="./react-dom.development.js"></script>
+    <script src="./babel.min.js"></script>
+    <script type="text/babel" src="./app.jsx"></script>
+  </body>
+</html>

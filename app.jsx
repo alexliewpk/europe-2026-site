@@ -336,7 +336,6 @@ function App() {
   const skipNextSharedSaveRef = useRef(false);
 
   const isEditMode = mode === "edit";
-  const cityCount = useMemo(() => new Set(items.map((item) => item.place).filter(Boolean)).size, [items]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ tripName, mode, columns, items }));
@@ -646,26 +645,7 @@ function App() {
       />
 
       <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <section className="mb-5 grid gap-3 sm:grid-cols-3">
-          <SummaryCard label="Items" value={items.length} />
-          <SummaryCard label="Places" value={cityCount} />
-          <SummaryCard label="Mode" value={isEditMode ? "Edit" : "View"} />
-        </section>
-
         <SaveStatus status={sharedStatus} message={sharedMessage} onSync={syncFromOnline} />
-
-        {isEditMode && (
-          <EditControls
-            columnName={columnName}
-            setColumnName={setColumnName}
-            addColumn={addColumn}
-            resetSampleData={resetSampleData}
-            exportExcel={exportExcel}
-            importExcelFile={importExcelFile}
-            importInputRef={importInputRef}
-            importMessage={importMessage}
-          />
-        )}
 
         <ItineraryCards
           columns={columns}

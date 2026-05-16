@@ -1,6 +1,10 @@
 const { useEffect, useMemo, useRef, useState } = React;
 
 const STORAGE_KEY = "travel-itinerary-v2";
+const SUPABASE_TABLE = "trip_itineraries";
+const SUPABASE_ROW_ID = "europe-2026";
+const SUPABASE_URL = "https://xukgdrnqkwuxsmaqwvta.supabase.co";
+const SUPABASE_ANON_KEY = "sb_publishable_i_QWouaGp43S5jsC0_3UXA_1TyXSMly";
 
 const sessionTypes = [
   { id: "morning", label: "Morning" },
@@ -197,6 +201,36 @@ function readSavedState() {
   }
 }
 
+function getSupabaseConfig() {
+  const config = window.TRAVEL_CONFIG || {};
+  return {
+    url: config.supabaseUrl || SUPABASE_URL,
+    anonKey: config.supabaseAnonKey || SUPABASE_ANON_KEY
+  };
+}
+
+function createSupabaseClient() {
+  const config = getSupabaseConfig();
+  if (!config.url || !config.anonKey || !window.supabase) return null;
+  return window.supabase.createClient(config.url, config.anonKey);
+}
+
+function createSharedData(tripName, columns, items) {
+  return {
+    tripName,
+    columns,
+    items: items.map(normalizeItem)
+  };
+}
+
+function normalizeSharedData(data) {
+  return {
+    tripName: data?.tripName || "Europe Trip 2026",
+    columns: Array.isArray(data?.columns) && data.columns.length ? data.columns : defaultColumns,
+    items: Array.isArray(data?.items) ? data.items.map(normalizeItem) : sampleItems
+  };
+}
+
 function cleanColumnId(label) {
   return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `column-${Date.now()}`;
 }
@@ -285,6 +319,7 @@ function parseCsv(text) {
 }
 
 function App() {
+  const savedState = readSavedState();
   const [tripName, setTripName] = useState(() => readSavedState().tripName);
   const [mode, setMode] = useState(() => readSavedState().mode);
   const [columns, setColumns] = useState(() => readSavedState().columns);
@@ -292,6 +327,10 @@ function App() {
   const [editingItem, setEditingItem] = useState(null);
   const [columnName, setColumnName] = useState("");
   const [importMessage, setImportMessage] = useState("");
+  const [sharedStatus, setSharedStatus] = useState("checking");
+  const [sharedMessage, setSharedMessage] = useState("Checking shared online save...");
+  const [sharedReady, setSharedReady] = useState(false);
+  const [hasLoadedShared, setHasLoadedShared] = useState(false);
   const importInputRef = useRef(null);
 
   const isEditMode = mode === "edit";
@@ -300,6 +339,91 @@ function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ tripName, mode, columns, items }));
   }, [tripName, mode, columns, items]);
+
+  useEffect(() => {
+    const client = createSupabaseClient();
+    if (!client) {
+      setSharedStatus("local");
+      setSharedMessage("This device only. Add Supabase keys to share updates with your wife.");
+      setHasLoadedShared(true);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function loadSharedTrip() {
+      setSharedStatus("syncing");
+      setSharedMessage("Loading shared itinerary...");
+
+      const { data, error } = await client
+        .from(SUPABASE_TABLE)
+        .select("data")
+        .eq("id", SUPABASE_ROW_ID)
+        .maybeSingle();
+
+      if (cancelled) return;
+
+      if (error) {
+        setSharedStatus("error");
+        setSharedMessage("Supabase is not ready yet. Check the table setup and permissions.");
+        setHasLoadedShared(true);
+        return;
+      }
+
+      if (data?.data) {
+        const shared = normalizeSharedData(data.data);
+        setTripName(shared.tripName);
+        setColumns(shared.columns);
+        setItems(shared.items);
+      } else {
+        await client.from(SUPABASE_TABLE).upsert({
+          id: SUPABASE_ROW_ID,
+          data: createSharedData(savedState.tripName, savedState.columns, savedState.items),
+          updated_at: new Date().toISOString()
+        });
+      }
+
+      setSharedReady(true);
+      setSharedStatus("shared");
+      setSharedMessage("Shared online. Updates save for both computers.");
+      setHasLoadedShared(true);
+    }
+
+    loadSharedTrip();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!sharedReady || !hasLoadedShared) return;
+
+    const client = createSupabaseClient();
+    if (!client) return;
+
+    setSharedStatus("syncing");
+    setSharedMessage("Saving online...");
+
+    const timeoutId = setTimeout(async () => {
+      const { error } = await client.from(SUPABASE_TABLE).upsert({
+        id: SUPABASE_ROW_ID,
+        data: createSharedData(tripName, columns, items),
+        updated_at: new Date().toISOString()
+      });
+
+      if (error) {
+        setSharedStatus("error");
+        setSharedMessage("Could not save online. It is still saved on this device.");
+        return;
+      }
+
+      setSharedStatus("shared");
+      setSharedMessage("Saved online for both computers.");
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
+  }, [tripName, columns, items, sharedReady, hasLoadedShared]);
 
   function openNewItem() {
     setEditingItem(createEmptyItem(columns));
@@ -446,6 +570,8 @@ function App() {
           <SummaryCard label="Mode" value={isEditMode ? "Edit" : "View"} />
         </section>
 
+        <SaveStatus status={sharedStatus} message={sharedMessage} />
+
         {isEditMode && (
           <EditControls
             columnName={columnName}
@@ -517,6 +643,23 @@ function TopBar({ tripName, setTripName, isEditMode, setMode, openNewItem }) {
         </div>
       </div>
     </header>
+  );
+}
+
+function SaveStatus({ status, message }) {
+  const styles = {
+    checking: "border-slate-200 bg-white text-slate-700",
+    syncing: "border-amber-200 bg-amber-50 text-amber-900",
+    shared: "border-teal-200 bg-teal-50 text-teal-900",
+    local: "border-slate-200 bg-white text-slate-700",
+    error: "border-rose-200 bg-rose-50 text-rose-900"
+  };
+  const label = status === "shared" ? "Shared Online" : status === "syncing" ? "Syncing" : status === "error" ? "Needs Setup" : "This Device Only";
+
+  return (
+    <div className={`mb-5 rounded-lg border px-4 py-3 text-base font-semibold ${styles[status] || styles.local}`}>
+      <span className="font-black">{label}:</span> {message}
+    </div>
   );
 }
 

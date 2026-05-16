@@ -342,6 +342,45 @@ function App() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ tripName, mode, columns, items }));
   }, [tripName, mode, columns, items]);
 
+  async function syncFromOnline() {
+    const client = createSupabaseClient();
+    if (!client) {
+      setSharedStatus("local");
+      setSharedMessage("This device only. Add Supabase keys to share updates.");
+      return;
+    }
+
+    setSharedStatus("syncing");
+    setSharedMessage("Checking latest shared itinerary...");
+
+    const { data, error } = await client
+      .from(SUPABASE_TABLE)
+      .select("data, updated_at")
+      .eq("id", SUPABASE_ROW_ID)
+      .maybeSingle();
+
+    if (error) {
+      setSharedStatus("error");
+      setSharedMessage("Could not load the shared itinerary. Try Sync Now again.");
+      return;
+    }
+
+    if (!data?.data) {
+      setSharedStatus("shared");
+      setSharedMessage("Shared online is ready. Save once to publish this itinerary.");
+      return;
+    }
+
+    const shared = normalizeSharedData(data.data);
+    skipNextSharedSaveRef.current = true;
+    setTripName(shared.tripName);
+    setColumns(shared.columns);
+    setItems(shared.items);
+    setLastRemoteUpdate(data.updated_at || "");
+    setSharedStatus("shared");
+    setSharedMessage("Loaded the latest shared itinerary.");
+  }
+
   useEffect(() => {
     const client = createSupabaseClient();
     if (!client) {
@@ -613,7 +652,7 @@ function App() {
           <SummaryCard label="Mode" value={isEditMode ? "Edit" : "View"} />
         </section>
 
-        <SaveStatus status={sharedStatus} message={sharedMessage} />
+        <SaveStatus status={sharedStatus} message={sharedMessage} onSync={syncFromOnline} />
 
         {isEditMode && (
           <EditControls
@@ -689,7 +728,7 @@ function TopBar({ tripName, setTripName, isEditMode, setMode, openNewItem }) {
   );
 }
 
-function SaveStatus({ status, message }) {
+function SaveStatus({ status, message, onSync }) {
   const styles = {
     checking: "border-slate-200 bg-white text-slate-700",
     syncing: "border-amber-200 bg-amber-50 text-amber-900",
@@ -700,8 +739,11 @@ function SaveStatus({ status, message }) {
   const label = status === "shared" ? "Shared Online" : status === "syncing" ? "Syncing" : status === "error" ? "Needs Setup" : "This Device Only";
 
   return (
-    <div className={`mb-5 rounded-lg border px-4 py-3 text-base font-semibold ${styles[status] || styles.local}`}>
-      <span className="font-black">{label}:</span> {message}
+    <div className={`mb-5 grid gap-3 rounded-lg border px-4 py-3 text-base font-semibold sm:grid-cols-[1fr_auto] sm:items-center ${styles[status] || styles.local}`}>
+      <p><span className="font-black">{label}:</span> {message}</p>
+      <button className="btn-soft bg-white px-3 py-2" type="button" onClick={onSync}>
+        Sync Now
+      </button>
     </div>
   );
 }

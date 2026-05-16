@@ -1,12 +1,16 @@
 const { useEffect, useMemo, useState } = React;
 
-const STORAGE_KEY = "travel-itinerary-v1";
+const STORAGE_KEY = "travel-itinerary-v2";
+
+const sessionTypes = [
+  { id: "morning", label: "Morning" },
+  { id: "evening", label: "Evening" },
+  { id: "night", label: "Night" }
+];
 
 const defaultColumns = [
   { id: "date", label: "Date", type: "text" },
-  { id: "time", label: "Time", type: "text" },
   { id: "place", label: "Place", type: "text" },
-  { id: "description", label: "Description", type: "textarea" },
   { id: "transport", label: "Transport", type: "text" },
   { id: "distance", label: "Distance", type: "text" },
   { id: "cost", label: "Cost", type: "text" },
@@ -17,9 +21,12 @@ const sampleItems = [
   {
     id: "sample-1",
     date: "25 May",
-    time: "19:35",
     place: "Budapest",
-    description: "Arrive at Budapest airport, transfer to Sipsix Apt, rest.",
+    sessions: {
+      morning: { time: "", plan: "" },
+      evening: { time: "19:35", plan: "Arrive at Budapest airport, transfer to Sipsix Apt, rest." },
+      night: { time: "", plan: "Settle in and keep the night easy." }
+    },
     transport: "Airport to hotel, about 40 mins, 30 Euro",
     distance: "",
     cost: "30 Euro",
@@ -28,9 +35,12 @@ const sampleItems = [
   {
     id: "sample-2",
     date: "26 May",
-    time: "Full day",
     place: "Budapest",
-    description: "Fisherman's Bastion, Matthias Church, Buda Castle area, museum walk, Chain Bridge, rose ice cream, Danube night cruise.",
+    sessions: {
+      morning: { time: "8:00", plan: "Fisherman's Bastion, Matthias Church, and Buda Castle area." },
+      evening: { time: "15:00", plan: "Museum walk, Chain Bridge, and rose ice cream." },
+      night: { time: "20:00", plan: "Danube night cruise and riverside views." }
+    },
     transport: "Hotel to Fisherman's Bastion by Bolt, about 20 mins",
     distance: "",
     cost: "6-10 Euro",
@@ -39,9 +49,12 @@ const sampleItems = [
   {
     id: "sample-3",
     date: "27 May",
-    time: "Full day",
     place: "Budapest",
-    description: "Hungarian Parliament, St. Stephen's Basilica, New York Cafe, Central Market Hall, sunset at Liberty Bridge.",
+    sessions: {
+      morning: { time: "9:00", plan: "Hungarian Parliament and St. Stephen's Basilica." },
+      evening: { time: "15:00", plan: "New York Cafe and Central Market Hall." },
+      night: { time: "19:00", plan: "Sunset at Liberty Bridge and dinner nearby." }
+    },
     transport: "Walk and local ride",
     distance: "",
     cost: "",
@@ -50,9 +63,12 @@ const sampleItems = [
   {
     id: "sample-4",
     date: "28 May",
-    time: "09:55",
     place: "Budapest to Vienna",
-    description: "Depart by train, arrive Vienna at 12:20, explore Vienna city area.",
+    sessions: {
+      morning: { time: "09:55", plan: "Depart Budapest by train." },
+      evening: { time: "12:20", plan: "Arrive in Vienna and explore the city area." },
+      night: { time: "", plan: "Check in at Vienna central apartment." }
+    },
     transport: "Train",
     distance: "",
     cost: "12 Euro Bolt to station",
@@ -61,9 +77,12 @@ const sampleItems = [
   {
     id: "sample-5",
     date: "29 May",
-    time: "06:28",
     place: "Vienna to Hallstatt",
-    description: "Day trip to Hallstatt. Ferry to town, return to Vienna at 16:25, dinner after arrival.",
+    sessions: {
+      morning: { time: "06:28", plan: "Train from Vienna to Hallstatt." },
+      evening: { time: "10:20", plan: "Ferry to town and explore Hallstatt." },
+      night: { time: "19:30", plan: "Return to Vienna and dinner after arrival." }
+    },
     transport: "Train and ferry",
     distance: "",
     cost: "",
@@ -72,9 +91,12 @@ const sampleItems = [
   {
     id: "sample-6",
     date: "30 May",
-    time: "10:10",
     place: "Vienna to Prague",
-    description: "Depart Vienna, arrive Prague at 14:15, walk Old Town.",
+    sessions: {
+      morning: { time: "10:10", plan: "Depart Vienna by train." },
+      evening: { time: "14:15", plan: "Arrive in Prague and walk Old Town." },
+      night: { time: "", plan: "Stay at Historic Centre Apt 4." }
+    },
     transport: "Train",
     distance: "",
     cost: "",
@@ -83,9 +105,12 @@ const sampleItems = [
   {
     id: "sample-7",
     date: "31 May",
-    time: "Full day",
     place: "Prague",
-    description: "Charles Bridge and Prague Castle.",
+    sessions: {
+      morning: { time: "8:00", plan: "Start early at Charles Bridge." },
+      evening: { time: "14:00", plan: "Visit Prague Castle." },
+      night: { time: "", plan: "Free evening around the old streets." }
+    },
     transport: "Walk / local transport",
     distance: "",
     cost: "",
@@ -94,9 +119,12 @@ const sampleItems = [
   {
     id: "sample-8",
     date: "1 June",
-    time: "Full day",
     place: "Prague",
-    description: "Old Town and Astronomical Clock.",
+    sessions: {
+      morning: { time: "9:00", plan: "Old Town walk." },
+      evening: { time: "15:00", plan: "Astronomical Clock and nearby streets." },
+      night: { time: "", plan: "Final full sightseeing night." }
+    },
     transport: "Walk",
     distance: "",
     cost: "",
@@ -105,9 +133,12 @@ const sampleItems = [
   {
     id: "sample-9",
     date: "2 June",
-    time: "09:15",
     place: "Prague",
-    description: "Fly back to Kuala Lumpur.",
+    sessions: {
+      morning: { time: "09:15", plan: "Fly back to Kuala Lumpur." },
+      evening: { time: "", plan: "" },
+      night: { time: "", plan: "" }
+    },
     transport: "Flight",
     distance: "",
     cost: "",
@@ -116,13 +147,32 @@ const sampleItems = [
 ];
 
 function createEmptyItem(columns) {
-  return columns.reduce(
+  const item = columns.reduce(
     (item, column) => {
       item[column.id] = "";
       return item;
     },
-    { id: crypto.randomUUID() }
+    { id: crypto.randomUUID(), sessions: createEmptySessions() }
   );
+  item.sessions = createEmptySessions();
+  return item;
+}
+
+function createEmptySessions() {
+  return sessionTypes.reduce((sessions, session) => {
+    sessions[session.id] = { time: "", plan: "" };
+    return sessions;
+  }, {});
+}
+
+function normalizeItem(item) {
+  return {
+    ...item,
+    sessions: {
+      ...createEmptySessions(),
+      ...(item.sessions || {})
+    }
+  };
 }
 
 function readSavedState() {
@@ -140,7 +190,7 @@ function readSavedState() {
       ...fallback,
       ...saved,
       columns: Array.isArray(saved.columns) && saved.columns.length ? saved.columns : defaultColumns,
-      items: Array.isArray(saved.items) ? saved.items : sampleItems
+      items: Array.isArray(saved.items) ? saved.items.map(normalizeItem) : sampleItems
     };
   } catch {
     return fallback;
@@ -285,9 +335,11 @@ function TopBar({ tripName, setTripName, isEditMode, setMode, openNewItem }) {
           >
             {isEditMode ? "View Mode" : "Edit Mode"}
           </button>
-          <button className="btn-primary flex-1 sm:flex-none" onClick={openNewItem}>
-            Add
-          </button>
+          {isEditMode && (
+            <button className="btn-primary flex-1 sm:flex-none" onClick={openNewItem}>
+              Add
+            </button>
+          )}
         </div>
       </div>
     </header>
@@ -339,12 +391,14 @@ function ItineraryCards({ columns, items, isEditMode, onEdit, onDelete }) {
               <p className="text-lg font-black text-slate-950">{item.date || "Date not set"}</p>
               <p className="mt-1 text-xl font-black text-teal-800">{item.place || "Place not set"}</p>
             </div>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-800">{item.time || "Anytime"}</span>
+            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-800">3 sessions</span>
           </div>
+
+          <SessionDisplay sessions={item.sessions} />
 
           <div className="grid gap-3">
             {columns
-              .filter((column) => !["date", "time", "place"].includes(column.id))
+              .filter((column) => !["date", "place"].includes(column.id))
               .map((column) => (
                 <FieldDisplay key={column.id} label={column.label} value={item[column.id]} />
               ))}
@@ -385,6 +439,7 @@ function ItineraryTable({ columns, items, isEditMode, onEdit, onDelete, onRemove
                   </div>
                 </th>
               ))}
+              <th className="border-b border-slate-200 px-4 py-3 font-black">Sessions</th>
               {isEditMode && <th className="border-b border-slate-200 px-4 py-3 font-black">Actions</th>}
             </tr>
           </thead>
@@ -393,11 +448,14 @@ function ItineraryTable({ columns, items, isEditMode, onEdit, onDelete, onRemove
               <tr key={item.id} className="align-top odd:bg-white even:bg-slate-50">
                 {columns.map((column) => (
                   <td key={column.id} className="border-b border-slate-200 px-4 py-4">
-                    <span className={column.id === "description" || column.id === "notes" ? "block max-w-md leading-relaxed" : "font-semibold"}>
+                    <span className={column.id === "notes" ? "block max-w-md leading-relaxed" : "font-semibold"}>
                       {item[column.id] || "-"}
                     </span>
                   </td>
                 ))}
+                <td className="border-b border-slate-200 px-4 py-4">
+                  <SessionDisplay sessions={item.sessions} compact />
+                </td>
                 {isEditMode && (
                   <td className="border-b border-slate-200 px-4 py-4">
                     <div className="flex gap-2">
@@ -415,6 +473,27 @@ function ItineraryTable({ columns, items, isEditMode, onEdit, onDelete, onRemove
   );
 }
 
+function SessionDisplay({ sessions, compact = false }) {
+  const safeSessions = { ...createEmptySessions(), ...(sessions || {}) };
+
+  return (
+    <div className={`grid gap-3 ${compact ? "min-w-[360px]" : "mb-3"}`}>
+      {sessionTypes.map((session) => {
+        const entry = safeSessions[session.id] || { time: "", plan: "" };
+        return (
+          <div key={session.id} className="rounded-lg border border-slate-200 bg-white p-3">
+            <div className="mb-1 flex items-center justify-between gap-3">
+              <p className="text-sm font-black uppercase tracking-wide text-teal-700">{session.label}</p>
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-sm font-bold text-slate-700">{entry.time || "Time TBC"}</span>
+            </div>
+            <p className="whitespace-pre-wrap text-base font-semibold leading-relaxed text-slate-900">{entry.plan || "-"}</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function FieldDisplay({ label, value }) {
   return (
     <div className="rounded-lg bg-slate-50 p-3">
@@ -425,10 +504,24 @@ function FieldDisplay({ label, value }) {
 }
 
 function ItemEditor({ columns, item, onCancel, onSave }) {
-  const [draft, setDraft] = useState(item);
+  const [draft, setDraft] = useState(normalizeItem(item));
 
   function updateValue(columnId, value) {
     setDraft((current) => ({ ...current, [columnId]: value }));
+  }
+
+  function updateSession(sessionId, field, value) {
+    setDraft((current) => ({
+      ...current,
+      sessions: {
+        ...createEmptySessions(),
+        ...(current.sessions || {}),
+        [sessionId]: {
+          ...((current.sessions || {})[sessionId] || { time: "", plan: "" }),
+          [field]: value
+        }
+      }
+    }));
   }
 
   function submit(event) {
@@ -468,6 +561,44 @@ function ItemEditor({ columns, item, onCancel, onSave }) {
               </label>
             ))}
           </div>
+
+          <section className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+            <div className="mb-4">
+              <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Daily Sessions</p>
+              <h3 className="text-xl font-black text-slate-950">Morning, Evening, Night</h3>
+            </div>
+            <div className="grid gap-4">
+              {sessionTypes.map((session) => {
+                const entry = (draft.sessions || {})[session.id] || { time: "", plan: "" };
+                return (
+                  <div key={session.id} className="rounded-lg border border-slate-200 bg-white p-4">
+                    <p className="mb-3 text-base font-black text-slate-950">{session.label}</p>
+                    <div className="grid gap-3 sm:grid-cols-[180px_1fr]">
+                      <label className="field-label">
+                        Time
+                        <input
+                          className="field-input"
+                          value={entry.time}
+                          onChange={(event) => updateSession(session.id, "time", event.target.value)}
+                          placeholder="Example: 8:00"
+                        />
+                      </label>
+                      <label className="field-label">
+                        Plan
+                        <textarea
+                          className="field-input min-h-24"
+                          value={entry.plan}
+                          onChange={(event) => updateSession(session.id, "plan", event.target.value)}
+                          placeholder={`What will you do in the ${session.label.toLowerCase()}?`}
+                        />
+                      </label>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
           <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
             <p className="text-sm font-semibold text-slate-500">Saved automatically after you press Save.</p>
             <button className="btn-soft" type="button" onClick={onCancel}>Cancel</button>

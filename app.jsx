@@ -37,8 +37,6 @@ const defaultColumns = [
   { id: "date", label: "Date", type: "text" },
   { id: "place", label: "Place", type: "text" },
   { id: "transport", label: "Transport", type: "text" },
-  { id: "distance", label: "Distance", type: "text" },
-  { id: "cost", label: "Cost", type: "text" },
   { id: "notes", label: "Notes", type: "textarea" }
 ];
 
@@ -247,7 +245,9 @@ function createSharedData(tripName, columns, items) {
 function normalizeSharedData(data) {
   return {
     tripName: data?.tripName || "Europe Trip 2026",
-    columns: Array.isArray(data?.columns) && data.columns.length ? data.columns : defaultColumns,
+    columns: Array.isArray(data?.columns) && data.columns.length
+      ? data.columns.filter((column) => !["distance", "cost"].includes(column.id))
+      : defaultColumns,
     items: Array.isArray(data?.items) ? data.items.map(normalizeItem) : sampleItems
   };
 }

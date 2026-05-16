@@ -327,6 +327,8 @@ function App() {
   const [editingItem, setEditingItem] = useState(null);
   const [columnName, setColumnName] = useState("");
   const [importMessage, setImportMessage] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [placeFilter, setPlaceFilter] = useState("all");
   const [sharedStatus, setSharedStatus] = useState("checking");
   const [sharedMessage, setSharedMessage] = useState("Checking shared online save...");
   const [sharedReady, setSharedReady] = useState(false);
@@ -336,6 +338,17 @@ function App() {
   const skipNextSharedSaveRef = useRef(false);
 
   const isEditMode = mode === "edit";
+  const dateOptions = useMemo(() => [...new Set(items.map((item) => item.date).filter(Boolean))], [items]);
+  const placeOptions = useMemo(() => [...new Set(items.map((item) => item.place).filter(Boolean))], [items]);
+  const filteredItems = useMemo(
+    () =>
+      items.filter((item) => {
+        const matchesDate = dateFilter === "all" || item.date === dateFilter;
+        const matchesPlace = placeFilter === "all" || item.place === placeFilter;
+        return matchesDate && matchesPlace;
+      }),
+    [items, dateFilter, placeFilter]
+  );
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify({ tripName, mode, columns, items }));
@@ -647,9 +660,20 @@ function App() {
       <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
         <SaveStatus status={sharedStatus} message={sharedMessage} onSync={syncFromOnline} />
 
+        <FilterBar
+          dateFilter={dateFilter}
+          setDateFilter={setDateFilter}
+          placeFilter={placeFilter}
+          setPlaceFilter={setPlaceFilter}
+          dateOptions={dateOptions}
+          placeOptions={placeOptions}
+          resultCount={filteredItems.length}
+          totalCount={items.length}
+        />
+
         <ItineraryCards
           columns={columns}
-          items={items}
+          items={filteredItems}
           isEditMode={isEditMode}
           onEdit={setEditingItem}
           onDelete={deleteItem}
@@ -657,7 +681,7 @@ function App() {
 
         <ItineraryTable
           columns={columns}
-          items={items}
+          items={filteredItems}
           isEditMode={isEditMode}
           onEdit={setEditingItem}
           onDelete={deleteItem}
@@ -725,6 +749,57 @@ function SaveStatus({ status, message, onSync }) {
         Sync Now
       </button>
     </div>
+  );
+}
+
+function FilterBar({
+  dateFilter,
+  setDateFilter,
+  placeFilter,
+  setPlaceFilter,
+  dateOptions,
+  placeOptions,
+  resultCount,
+  totalCount
+}) {
+  function clearFilters() {
+    setDateFilter("all");
+    setPlaceFilter("all");
+  }
+
+  return (
+    <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+        <label className="field-label">
+          Filter by date
+          <select className="field-input" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
+            <option value="all">All dates</option>
+            {dateOptions.map((date) => (
+              <option key={date} value={date}>
+                {date}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          Filter by place
+          <select className="field-input" value={placeFilter} onChange={(event) => setPlaceFilter(event.target.value)}>
+            <option value="all">All places</option>
+            {placeOptions.map((place) => (
+              <option key={place} value={place}>
+                {place}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button className="btn-soft" type="button" onClick={clearFilters}>
+          Clear
+        </button>
+        <p className="text-sm font-bold text-slate-500 md:text-right">
+          Showing {resultCount} of {totalCount}
+        </p>
+      </div>
+    </section>
   );
 }
 

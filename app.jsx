@@ -1,4 +1,4 @@
-const { useEffect, useMemo, useState } = React;
+const { useEffect, useMemo, useRef, useState } = React;
 
 const STORAGE_KEY = "travel-itinerary-v2";
 
@@ -197,6 +197,93 @@ function readSavedState() {
   }
 }
 
+function cleanColumnId(label) {
+  return label.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `column-${Date.now()}`;
+}
+
+function csvValue(value) {
+  return `"${String(value || "").replace(/"/g, '""')}"`;
+}
+
+function buildCsv(columns, items) {
+  const customColumns = columns.filter((column) => !["date", "place", "transport", "distance", "cost", "notes"].includes(column.id));
+  const headers = [
+    "Date",
+    "Place",
+    "Morning Time",
+    "Morning Plan",
+    "Evening Time",
+    "Evening Plan",
+    "Night Time",
+    "Night Plan",
+    "Transport",
+    "Distance",
+    "Cost",
+    "Notes",
+    ...customColumns.map((column) => column.label)
+  ];
+
+  const rows = items.map((item) => {
+    const sessions = { ...createEmptySessions(), ...(item.sessions || {}) };
+    return [
+      item.date,
+      item.place,
+      sessions.morning.time,
+      sessions.morning.plan,
+      sessions.evening.time,
+      sessions.evening.plan,
+      sessions.night.time,
+      sessions.night.plan,
+      item.transport,
+      item.distance,
+      item.cost,
+      item.notes,
+      ...customColumns.map((column) => item[column.id])
+    ];
+  });
+
+  return [headers, ...rows].map((row) => row.map(csvValue).join(",")).join("\n");
+}
+
+function parseCsv(text) {
+  const rows = [];
+  let row = [];
+  let value = "";
+  let quoted = false;
+
+  for (let index = 0; index < text.length; index += 1) {
+    const char = text[index];
+    const next = text[index + 1];
+
+    if (quoted) {
+      if (char === '"' && next === '"') {
+        value += '"';
+        index += 1;
+      } else if (char === '"') {
+        quoted = false;
+      } else {
+        value += char;
+      }
+    } else if (char === '"') {
+      quoted = true;
+    } else if (char === ",") {
+      row.push(value);
+      value = "";
+    } else if (char === "\n") {
+      row.push(value);
+      rows.push(row);
+      row = [];
+      value = "";
+    } else if (char !== "\r") {
+      value += char;
+    }
+  }
+
+  row.push(value);
+  rows.push(row);
+  return rows.filter((entry) => entry.some((cell) => cell.trim()));
+}
+
 function App() {
   const [tripName, setTripName] = useState(() => readSavedState().tripName);
   const [mode, setMode] = useState(() => readSavedState().mode);
@@ -204,6 +291,8 @@ function App() {
   const [items, setItems] = useState(() => readSavedState().items);
   const [editingItem, setEditingItem] = useState(null);
   const [columnName, setColumnName] = useState("");
+  const [importMessage, setImportMessage] = useState("");
+  const importInputRef = useRef(null);
 
   const isEditMode = mode === "edit";
   const cityCount = useMemo(() => new Set(items.map((item) => item.place).filter(Boolean)).size, [items]);
@@ -233,7 +322,7 @@ function App() {
     const cleanName = columnName.trim();
     if (!cleanName) return;
 
-    const id = cleanName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || `column-${Date.now()}`;
+    const id = cleanColumnId(cleanName);
     const uniqueId = columns.some((column) => column.id === id) ? `${id}-${Date.now()}` : id;
     const newColumn = { id: uniqueId, label: cleanName, type: "text", custom: true };
 
@@ -259,6 +348,87 @@ function App() {
     setEditingItem(null);
   }
 
+  function exportExcel() {
+    const csv = buildCsv(columns, items);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${tripName.trim() || "Europe Trip 2026"}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setImportMessage("Exported. Open the CSV file with Excel.");
+  }
+
+  function importExcelFile(event) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const rows = parseCsv(String(reader.result || ""));
+      const headers = rows[0] || [];
+      const dataRows = rows.slice(1);
+
+      const headerMap = headers.reduce((map, header, index) => {
+        map[header.trim().toLowerCase()] = index;
+        return map;
+      }, {});
+
+      const knownHeaders = new Set([
+        "date",
+        "place",
+        "morning time",
+        "morning plan",
+        "evening time",
+        "evening plan",
+        "night time",
+        "night plan",
+        "transport",
+        "distance",
+        "cost",
+        "notes"
+      ]);
+
+      const customColumns = headers
+        .filter((header) => header.trim() && !knownHeaders.has(header.trim().toLowerCase()))
+        .map((header) => ({ id: cleanColumnId(header), label: header.trim(), type: "text", custom: true }));
+
+      const nextColumns = [...defaultColumns, ...customColumns];
+      const nextItems = dataRows.map((row) => {
+        const cell = (name) => row[headerMap[name]] || "";
+        const item = {
+          id: crypto.randomUUID(),
+          date: cell("date"),
+          place: cell("place"),
+          sessions: {
+            morning: { time: cell("morning time"), plan: cell("morning plan") },
+            evening: { time: cell("evening time"), plan: cell("evening plan") },
+            night: { time: cell("night time"), plan: cell("night plan") }
+          },
+          transport: cell("transport"),
+          distance: cell("distance"),
+          cost: cell("cost"),
+          notes: cell("notes")
+        };
+
+        customColumns.forEach((column) => {
+          item[column.id] = row[headers.indexOf(column.label)] || "";
+        });
+
+        return normalizeItem(item);
+      });
+
+      setColumns(nextColumns);
+      setItems(nextItems);
+      setImportMessage(`Imported ${nextItems.length} itinerary items from Excel CSV.`);
+      event.target.value = "";
+    };
+    reader.readAsText(file);
+  }
+
   return (
     <div className="min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#f5f1e8_52%,#eff6f3_100%)]">
       <TopBar
@@ -282,6 +452,10 @@ function App() {
             setColumnName={setColumnName}
             addColumn={addColumn}
             resetSampleData={resetSampleData}
+            exportExcel={exportExcel}
+            importExcelFile={importExcelFile}
+            importInputRef={importInputRef}
+            importMessage={importMessage}
           />
         )}
 
@@ -355,7 +529,7 @@ function SummaryCard({ label, value }) {
   );
 }
 
-function EditControls({ columnName, setColumnName, addColumn, resetSampleData }) {
+function EditControls({ columnName, setColumnName, addColumn, resetSampleData, exportExcel, importExcelFile, importInputRef, importMessage }) {
   return (
     <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
       <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
@@ -376,6 +550,24 @@ function EditControls({ columnName, setColumnName, addColumn, resetSampleData })
         <button className="btn-soft" onClick={resetSampleData}>
           Reload Sample
         </button>
+      </div>
+      <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-[auto_auto_1fr] sm:items-center">
+        <button className="btn-primary" type="button" onClick={exportExcel}>
+          Export Excel
+        </button>
+        <button className="btn-soft" type="button" onClick={() => importInputRef.current?.click()}>
+          Import Excel CSV
+        </button>
+        <input
+          ref={importInputRef}
+          className="hidden"
+          type="file"
+          accept=".csv,text/csv"
+          onChange={importExcelFile}
+        />
+        <p className="text-sm font-semibold text-slate-500">
+          {importMessage || "Excel export uses CSV, which opens cleanly in Microsoft Excel."}
+        </p>
       </div>
     </section>
   );

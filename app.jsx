@@ -12,6 +12,27 @@ const sessionTypes = [
   { id: "night", label: "Night" }
 ];
 
+const sessionStyles = {
+  morning: {
+    card: "border-yellow-200 bg-yellow-50",
+    label: "text-yellow-800",
+    time: "bg-yellow-100 text-yellow-900",
+    plan: "text-slate-950"
+  },
+  evening: {
+    card: "border-sky-200 bg-sky-50",
+    label: "text-sky-800",
+    time: "bg-sky-100 text-sky-900",
+    plan: "text-slate-950"
+  },
+  night: {
+    card: "border-blue-950 bg-blue-950",
+    label: "text-blue-100",
+    time: "bg-blue-900 text-white",
+    plan: "text-white"
+  }
+};
+
 const defaultColumns = [
   { id: "date", label: "Date", type: "text" },
   { id: "place", label: "Place", type: "text" },
@@ -955,13 +976,14 @@ function SessionDisplay({ sessions, compact = false }) {
     <div className={`grid gap-3 ${compact ? "min-w-[360px]" : "mb-3"}`}>
       {sessionTypes.map((session) => {
         const entry = safeSessions[session.id] || { time: "", plan: "" };
+        const style = sessionStyles[session.id] || sessionStyles.morning;
         return (
-          <div key={session.id} className="rounded-lg border border-slate-200 bg-white p-3">
+          <div key={session.id} className={`rounded-lg border p-3 ${style.card}`}>
             <div className="mb-1 flex items-center justify-between gap-3">
-              <p className="text-sm font-black uppercase tracking-wide text-teal-700">{session.label}</p>
-              <span className="rounded-full bg-slate-100 px-2 py-1 text-sm font-bold text-slate-700">{entry.time || "Time TBC"}</span>
+              <p className={`text-sm font-black uppercase tracking-wide ${style.label}`}>{session.label}</p>
+              <span className={`rounded-full px-2 py-1 text-sm font-bold ${style.time}`}>{entry.time || "Time TBC"}</span>
             </div>
-            <p className="whitespace-pre-wrap text-base font-semibold leading-relaxed text-slate-900">{entry.plan || "-"}</p>
+            <p className={`whitespace-pre-wrap text-base font-semibold leading-relaxed ${style.plan}`}>{entry.plan || "-"}</p>
           </div>
         );
       })}

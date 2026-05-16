@@ -331,7 +331,9 @@ function App() {
   const [sharedMessage, setSharedMessage] = useState("Checking shared online save...");
   const [sharedReady, setSharedReady] = useState(false);
   const [hasLoadedShared, setHasLoadedShared] = useState(false);
+  const [lastRemoteUpdate, setLastRemoteUpdate] = useState("");
   const importInputRef = useRef(null);
+  const skipNextSharedSaveRef = useRef(false);
 
   const isEditMode = mode === "edit";
   const cityCount = useMemo(() => new Set(items.map((item) => item.place).filter(Boolean)).size, [items]);
@@ -357,7 +359,7 @@ function App() {
 
       const { data, error } = await client
         .from(SUPABASE_TABLE)
-        .select("data")
+        .select("data, updated_at")
         .eq("id", SUPABASE_ROW_ID)
         .maybeSingle();
 
@@ -372,15 +374,19 @@ function App() {
 
       if (data?.data) {
         const shared = normalizeSharedData(data.data);
+        skipNextSharedSaveRef.current = true;
         setTripName(shared.tripName);
         setColumns(shared.columns);
         setItems(shared.items);
+        setLastRemoteUpdate(data.updated_at || "");
       } else {
+        const firstSavedAt = new Date().toISOString();
         await client.from(SUPABASE_TABLE).upsert({
           id: SUPABASE_ROW_ID,
           data: createSharedData(savedState.tripName, savedState.columns, savedState.items),
-          updated_at: new Date().toISOString()
+          updated_at: firstSavedAt
         });
+        setLastRemoteUpdate(firstSavedAt);
       }
 
       setSharedReady(true);
@@ -402,14 +408,20 @@ function App() {
     const client = createSupabaseClient();
     if (!client) return;
 
+    if (skipNextSharedSaveRef.current) {
+      skipNextSharedSaveRef.current = false;
+      return;
+    }
+
     setSharedStatus("syncing");
     setSharedMessage("Saving online...");
 
     const timeoutId = setTimeout(async () => {
+      const savedAt = new Date().toISOString();
       const { error } = await client.from(SUPABASE_TABLE).upsert({
         id: SUPABASE_ROW_ID,
         data: createSharedData(tripName, columns, items),
-        updated_at: new Date().toISOString()
+        updated_at: savedAt
       });
 
       if (error) {
@@ -420,10 +432,41 @@ function App() {
 
       setSharedStatus("shared");
       setSharedMessage("Saved online for both computers.");
+      setLastRemoteUpdate(savedAt);
     }, 500);
 
     return () => clearTimeout(timeoutId);
   }, [tripName, columns, items, sharedReady, hasLoadedShared]);
+
+  useEffect(() => {
+    if (!sharedReady || !hasLoadedShared) return;
+
+    const client = createSupabaseClient();
+    if (!client) return;
+
+    const intervalId = setInterval(async () => {
+      if (editingItem) return;
+
+      const { data, error } = await client
+        .from(SUPABASE_TABLE)
+        .select("data, updated_at")
+        .eq("id", SUPABASE_ROW_ID)
+        .maybeSingle();
+
+      if (error || !data?.data || !data.updated_at || data.updated_at === lastRemoteUpdate) return;
+
+      const shared = normalizeSharedData(data.data);
+      skipNextSharedSaveRef.current = true;
+      setTripName(shared.tripName);
+      setColumns(shared.columns);
+      setItems(shared.items);
+      setLastRemoteUpdate(data.updated_at);
+      setSharedStatus("shared");
+      setSharedMessage("Updated from shared online save.");
+    }, 10000);
+
+    return () => clearInterval(intervalId);
+  }, [sharedReady, hasLoadedShared, lastRemoteUpdate, editingItem]);
 
   function openNewItem() {
     setEditingItem(createEmptyItem(columns));

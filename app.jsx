@@ -803,28 +803,43 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [ratesToMyr, setRatesToMyr] = useState(FALLBACK_RATES_TO_MYR);
   const [rateStatus, setRateStatus] = useState("Using backup rates");
-  const total = expenses.reduce((sum, expense) => sum + expenseMyr(expense), 0);
+  const [dateFilter, setDateFilter] = useState("all");
+  const [typeFilter, setTypeFilter] = useState("all");
+  const [payFilter, setPayFilter] = useState("all");
+  const filteredExpenses = expenses.filter((expense) => {
+    const matchesDate = dateFilter === "all" || expense.date === dateFilter;
+    const matchesType = typeFilter === "all" || expense.type === typeFilter;
+    const matchesPay = payFilter === "all" || expense.payBy === payFilter;
+    return matchesDate && matchesType && matchesPay;
+  });
+  const total = filteredExpenses.reduce((sum, expense) => sum + expenseMyr(expense), 0);
   const byType = EXPENSE_TYPES.map((type) => ({
     type,
-    total: expenses
+    total: filteredExpenses
       .filter((expense) => expense.type === type)
       .reduce((sum, expense) => sum + expenseMyr(expense), 0)
   })).filter((entry) => entry.total > 0);
-  const byDate = [...new Set(expenses.map((expense) => expense.date).filter(Boolean))]
+  const byDate = [...new Set(filteredExpenses.map((expense) => expense.date).filter(Boolean))]
     .map((date) => ({
       date,
-      total: expenses
+      total: filteredExpenses
         .filter((expense) => expense.date === date)
         .reduce((sum, expense) => sum + expenseMyr(expense), 0)
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
   const byPay = PAY_BY_OPTIONS.map((payBy) => ({
     payBy,
-    total: expenses
+    total: filteredExpenses
       .filter((expense) => expense.payBy === payBy)
       .reduce((sum, expense) => sum + expenseMyr(expense), 0)
   })).filter((entry) => entry.total > 0);
   const convertedDraftAmount = Number(draft.amount || 0) * Number(ratesToMyr[draft.currency] || 1);
+
+  function clearExpenseFilters() {
+    setDateFilter("all");
+    setTypeFilter("all");
+    setPayFilter("all");
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -1007,6 +1022,21 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         </section>
       </div>
 
+      <ExpensesFilterBar
+        dateFilter={dateFilter}
+        setDateFilter={setDateFilter}
+        typeFilter={typeFilter}
+        setTypeFilter={setTypeFilter}
+        payFilter={payFilter}
+        setPayFilter={setPayFilter}
+        dateOptions={dateOptions}
+        resultCount={filteredExpenses.length}
+        totalCount={expenses.length}
+        onClear={clearExpenseFilters}
+      />
+
+      <ExpenseGraph title="Expense Graph" data={byDate.length ? byDate : byType} />
+
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
         <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Date</p>
         <div className="mt-3 grid gap-2">
@@ -1020,9 +1050,9 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Expense List</p>
+        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Expenses summary</p>
         <div className="mt-3 grid gap-3">
-          {expenses.length ? expenses.map((expense) => (
+          {filteredExpenses.length ? filteredExpenses.map((expense) => (
             <ExpenseRow
               key={expense.id}
               expense={expense}
@@ -1033,9 +1063,93 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
               onSave={saveExpense}
               onDelete={deleteExpense}
             />
-          )) : <p className="text-base font-semibold text-slate-500">No expenses added yet.</p>}
+          )) : <p className="text-base font-semibold text-slate-500">No expenses match this filter.</p>}
         </div>
       </section>
+    </section>
+  );
+}
+
+function ExpensesFilterBar({
+  dateFilter,
+  setDateFilter,
+  typeFilter,
+  setTypeFilter,
+  payFilter,
+  setPayFilter,
+  dateOptions,
+  resultCount,
+  totalCount,
+  onClear
+}) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Filter</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto_auto] md:items-end">
+        <label className="field-label">
+          Date
+          <select className="field-input" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
+            <option value="all">All dates</option>
+            {dateOptions.map((date) => (
+              <option key={date} value={date}>{date}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          Type
+          <select className="field-input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
+            <option value="all">All types</option>
+            {EXPENSE_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          Pay by
+          <select className="field-input" value={payFilter} onChange={(event) => setPayFilter(event.target.value)}>
+            <option value="all">All people</option>
+            {PAY_BY_OPTIONS.map((payBy) => (
+              <option key={payBy} value={payBy}>{payBy}</option>
+            ))}
+          </select>
+        </label>
+        <button className="btn-soft" type="button" onClick={onClear}>
+          Clear
+        </button>
+        <p className="text-sm font-bold text-slate-500 md:text-right">
+          Showing {resultCount} of {totalCount}
+        </p>
+      </div>
+    </section>
+  );
+}
+
+function ExpenseGraph({ title, data }) {
+  const maxTotal = Math.max(...data.map((entry) => entry.total), 0);
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</p>
+      <div className="mt-4 grid gap-3">
+        {data.length ? data.map((entry) => {
+          const label = entry.date || entry.type || entry.payBy;
+          const width = maxTotal ? Math.max(8, (entry.total / maxTotal) * 100) : 0;
+          return (
+            <div key={label} className="grid gap-1">
+              <div className="flex items-center justify-between gap-3 text-sm font-bold">
+                <span className="text-slate-700">{label}</span>
+                <span className="text-slate-950">{money(entry.total)}</span>
+              </div>
+              <div className="h-4 overflow-hidden rounded-full bg-slate-100">
+                <div
+                  className="h-full rounded-full bg-teal-700"
+                  style={{ width: `${width}%` }}
+                />
+              </div>
+            </div>
+          );
+        }) : <p className="text-base font-semibold text-slate-500">Add expenses to see the graph.</p>}
+      </div>
     </section>
   );
 }

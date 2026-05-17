@@ -2,6 +2,13 @@ const { useEffect, useMemo, useRef, useState } = React;
 
 const STORAGE_KEY = "travel-itinerary-v2";
 const EXPENSE_TYPES = ["Food", "Transport", "Hotel", "Ticket", "Shopping", "Other"];
+const CURRENCY_OPTIONS = ["MYR", "EUR", "HUF", "CZK"];
+const FALLBACK_RATES_TO_MYR = {
+  MYR: 1,
+  EUR: 5.02,
+  HUF: 0.0125,
+  CZK: 0.205
+};
 const SUPABASE_TABLE = "trip_itineraries";
 const SUPABASE_ROW_ID = "europe-2026";
 const SUPABASE_URL = "https://xukgdrnqkwuxsmaqwvta.supabase.co";
@@ -197,17 +204,34 @@ function createEmptyExpense() {
     id: crypto.randomUUID(),
     date: "",
     type: "Food",
+    currency: "MYR",
     amount: "",
+    amountMyr: "",
+    rateToMyr: 1,
     notes: ""
   };
 }
 
 function normalizeExpense(expense) {
+  const currency = expense?.currency || "MYR";
+  const rateToMyr = Number(expense?.rateToMyr || FALLBACK_RATES_TO_MYR[currency] || 1);
+  const amount = Number(expense?.amount || 0);
   return {
     ...createEmptyExpense(),
     ...expense,
-    id: expense?.id || crypto.randomUUID()
+    id: expense?.id || crypto.randomUUID(),
+    currency,
+    rateToMyr,
+    amountMyr: Number(expense?.amountMyr || amount * rateToMyr)
   };
+}
+
+function money(value, currency = "MYR") {
+  return `${currency} ${Number(value || 0).toFixed(2)}`;
+}
+
+function expenseMyr(expense) {
+  return Number(expense.amountMyr || 0);
 }
 
 function normalizeItem(item) {
@@ -772,21 +796,56 @@ function TopBar({ tripName, setTripName, page }) {
 
 function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   const [draft, setDraft] = useState(createEmptyExpense);
-  const total = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+  const [ratesToMyr, setRatesToMyr] = useState(FALLBACK_RATES_TO_MYR);
+  const [rateStatus, setRateStatus] = useState("Using backup rates");
+  const total = expenses.reduce((sum, expense) => sum + expenseMyr(expense), 0);
   const byType = EXPENSE_TYPES.map((type) => ({
     type,
     total: expenses
       .filter((expense) => expense.type === type)
-      .reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
+      .reduce((sum, expense) => sum + expenseMyr(expense), 0)
   })).filter((entry) => entry.total > 0);
   const byDate = [...new Set(expenses.map((expense) => expense.date).filter(Boolean))]
     .map((date) => ({
       date,
       total: expenses
         .filter((expense) => expense.date === date)
-        .reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
+        .reduce((sum, expense) => sum + expenseMyr(expense), 0)
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+  const convertedDraftAmount = Number(draft.amount || 0) * Number(ratesToMyr[draft.currency] || 1);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadRates() {
+      try {
+        const response = await fetch("https://api.frankfurter.app/latest?from=EUR&to=MYR,HUF,CZK");
+        if (!response.ok) throw new Error("Rate request failed");
+        const data = await response.json();
+        const eurToMyr = Number(data?.rates?.MYR);
+        const eurToHuf = Number(data?.rates?.HUF);
+        const eurToCzk = Number(data?.rates?.CZK);
+        if (!eurToMyr || !eurToHuf || !eurToCzk) throw new Error("Missing rates");
+        if (!cancelled) {
+          setRatesToMyr({
+            MYR: 1,
+            EUR: eurToMyr,
+            HUF: eurToMyr / eurToHuf,
+            CZK: eurToMyr / eurToCzk
+          });
+          setRateStatus("Live rates loaded");
+        }
+      } catch {
+        if (!cancelled) setRateStatus("Using backup rates");
+      }
+    }
+
+    loadRates();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function updateDraft(field, value) {
     setDraft((current) => ({ ...current, [field]: value }));
@@ -796,7 +855,12 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
     event.preventDefault();
     if (!draft.date || !draft.type || !draft.amount) return;
 
-    setExpenses((current) => [...current, normalizeExpense(draft)]);
+    const rateToMyr = Number(ratesToMyr[draft.currency] || 1);
+    setExpenses((current) => [...current, normalizeExpense({
+      ...draft,
+      rateToMyr,
+      amountMyr: Number(draft.amount || 0) * rateToMyr
+    })]);
     setDraft(createEmptyExpense());
   }
 
@@ -810,7 +874,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Expenses</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950">Add trip expense</h2>
 
-        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]" onSubmit={addExpense}>
+        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]" onSubmit={addExpense}>
           <label className="field-label">
             Date
             <select
@@ -840,18 +904,31 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
             Amount
             <input
               className="field-input"
-              type="number"
-              min="0"
-              step="0.01"
+              inputMode="decimal"
               value={draft.amount}
               onChange={(event) => updateDraft("amount", event.target.value)}
               placeholder="0.00"
             />
           </label>
+          <label className="field-label">
+            Currency
+            <select
+              className="field-input"
+              value={draft.currency}
+              onChange={(event) => updateDraft("currency", event.target.value)}
+            >
+              {CURRENCY_OPTIONS.map((currency) => (
+                <option key={currency} value={currency}>{currency}</option>
+              ))}
+            </select>
+          </label>
           <button className="btn-primary self-end" type="submit">
             Add
           </button>
-          <label className="field-label md:col-span-4">
+          <p className="text-sm font-semibold text-slate-500 md:col-span-5">
+            MYR record: <span className="font-black text-slate-950">{money(convertedDraftAmount)}</span> · {rateStatus}
+          </p>
+          <label className="field-label md:col-span-5">
             Notes
             <input
               className="field-input"
@@ -866,8 +943,8 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
       <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
           <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total</p>
-          <p className="mt-1 text-4xl font-black text-slate-950">{total.toFixed(2)}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">All expenses entered</p>
+          <p className="mt-1 text-4xl font-black text-slate-950">{money(total)}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">All expenses converted to MYR</p>
         </section>
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
@@ -876,7 +953,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
             {byType.length ? byType.map((entry) => (
               <div key={entry.type} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
                 <span className="font-bold text-slate-700">{entry.type}</span>
-                <span className="font-black text-slate-950">{entry.total.toFixed(2)}</span>
+                <span className="font-black text-slate-950">{money(entry.total)}</span>
               </div>
             )) : <p className="text-base font-semibold text-slate-500">No expenses yet.</p>}
           </div>
@@ -889,7 +966,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
           {byDate.length ? byDate.map((entry) => (
             <div key={entry.date} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
               <span className="font-bold text-slate-700">{entry.date}</span>
-              <span className="font-black text-slate-950">{entry.total.toFixed(2)}</span>
+              <span className="font-black text-slate-950">{money(entry.total)}</span>
             </div>
           )) : <p className="text-base font-semibold text-slate-500">Add an expense to see statistics.</p>}
         </div>
@@ -899,14 +976,15 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Expense List</p>
         <div className="mt-3 grid gap-3">
           {expenses.length ? expenses.map((expense) => (
-            <div key={expense.id} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center">
+            <div key={expense.id} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-center">
               <p className="font-black text-slate-950">{expense.date || "-"}</p>
               <p className="font-bold text-teal-800">{expense.type || "-"}</p>
-              <p className="font-black text-slate-950">{Number(expense.amount || 0).toFixed(2)}</p>
+              <p className="font-bold text-slate-700">{money(expense.amount, expense.currency)}</p>
+              <p className="font-black text-slate-950">{money(expenseMyr(expense))}</p>
               <button className="btn-danger px-3 py-2 text-sm" type="button" onClick={() => deleteExpense(expense.id)}>
                 Delete
               </button>
-              {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-4">{expense.notes}</p>}
+              {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-5">{expense.notes}</p>}
             </div>
           )) : <p className="text-base font-semibold text-slate-500">No expenses added yet.</p>}
         </div>

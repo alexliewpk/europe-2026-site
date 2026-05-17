@@ -24,22 +24,22 @@ const sessionTypes = [
 
 const sessionStyles = {
   morning: {
-    card: "border-yellow-200 bg-yellow-50",
-    label: "text-yellow-800",
-    time: "bg-yellow-100 text-yellow-900",
+    card: "border-slate-200 bg-white",
+    label: "text-teal-700",
+    time: "bg-teal-50 text-teal-800",
     plan: "text-slate-950"
   },
   evening: {
-    card: "border-sky-200 bg-sky-50",
-    label: "text-sky-800",
-    time: "bg-sky-100 text-sky-900",
+    card: "border-slate-200 bg-white",
+    label: "text-teal-700",
+    time: "bg-slate-100 text-slate-700",
     plan: "text-slate-950"
   },
   night: {
-    card: "border-blue-950 bg-blue-950",
-    label: "text-blue-100",
-    time: "bg-blue-900 text-white",
-    plan: "text-white"
+    card: "border-slate-200 bg-white",
+    label: "text-teal-700",
+    time: "bg-slate-900 text-white",
+    plan: "text-slate-950"
   }
 };
 

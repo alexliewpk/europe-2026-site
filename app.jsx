@@ -749,6 +749,8 @@ function App() {
               placeOptions={placeOptions}
               resultCount={filteredItems.length}
               totalCount={items.length}
+              onExport={exportExcel}
+              exportMessage={importMessage}
             />
 
             <ItineraryCards
@@ -826,7 +828,8 @@ function Icon({ name, className = "h-4 w-4" }) {
     globe: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" /></>,
     morning: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></>,
     evening: <><path d="M4 18h16" /><path d="M7 15a5 5 0 0 1 10 0" /><path d="M12 5v3M5.6 8.6l2.1 2.1M18.4 8.6l-2.1 2.1" /></>,
-    night: <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" />
+    night: <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" />,
+    download: <><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></>
   };
 
   return (
@@ -1356,7 +1359,9 @@ function FilterBar({
   dateOptions,
   placeOptions,
   resultCount,
-  totalCount
+  totalCount,
+  onExport,
+  exportMessage
 }) {
   function clearFilters() {
     setDateFilter("all");
@@ -1365,7 +1370,7 @@ function FilterBar({
 
   return (
     <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto] md:items-end">
+      <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto_auto_auto] md:items-end">
         <label className="field-label">
           Filter by date
           <select className="field-input" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
@@ -1392,10 +1397,17 @@ function FilterBar({
           <Icon name="filter" />
           Clear
         </button>
+        <button className="btn-primary" type="button" onClick={onExport}>
+          <Icon name="download" />
+          Export Excel
+        </button>
         <p className="text-sm font-bold text-slate-500 md:text-right">
           Showing {resultCount} of {totalCount}
         </p>
       </div>
+      {exportMessage && (
+        <p className="mt-3 text-sm font-semibold text-slate-500">{exportMessage}</p>
+      )}
     </section>
   );
 }

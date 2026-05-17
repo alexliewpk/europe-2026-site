@@ -25,18 +25,21 @@ const sessionTypes = [
 const sessionStyles = {
   morning: {
     card: "border-slate-200 bg-white",
+    strip: "bg-amber-400",
     label: "text-teal-700",
-    time: "bg-teal-50 text-teal-800",
+    time: "bg-amber-50 text-amber-900",
     plan: "text-slate-950"
   },
   evening: {
     card: "border-slate-200 bg-white",
+    strip: "bg-sky-400",
     label: "text-teal-700",
-    time: "bg-slate-100 text-slate-700",
+    time: "bg-sky-50 text-sky-900",
     plan: "text-slate-950"
   },
   night: {
     card: "border-slate-200 bg-white",
+    strip: "bg-slate-900",
     label: "text-teal-700",
     time: "bg-slate-900 text-white",
     plan: "text-slate-950"
@@ -820,7 +823,10 @@ function Icon({ name, className = "h-4 w-4" }) {
     chart: <><path d="M4 19V5" /><path d="M8 17V9" /><path d="M13 17V6" /><path d="M18 17v-4" /><path d="M3 19h18" /></>,
     total: <path d="M7 7h10M7 12h10M7 17h6" />,
     user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
-    globe: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" /></>
+    globe: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" /></>,
+    morning: <><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" /></>,
+    evening: <><path d="M4 18h16" /><path d="M7 15a5 5 0 0 1 10 0" /><path d="M12 5v3M5.6 8.6l2.1 2.1M18.4 8.6l-2.1 2.1" /></>,
+    night: <path d="M21 12.8A8.5 8.5 0 1 1 11.2 3a6.5 6.5 0 0 0 9.8 9.8z" />
   };
 
   return (
@@ -1484,9 +1490,13 @@ function SessionDisplay({ sessions, compact = false }) {
         const entry = safeSessions[session.id] || { time: "", plan: "" };
         const style = sessionStyles[session.id] || sessionStyles.morning;
         return (
-          <div key={session.id} className={`rounded-lg border p-3 ${style.card}`}>
-            <div className="mb-1 flex items-center justify-between gap-3">
-              <p className={`text-sm font-black uppercase tracking-wide ${style.label}`}>{session.label}</p>
+          <div key={session.id} className={`relative overflow-hidden rounded-lg border p-3 pl-5 ${style.card}`}>
+            <div className={`absolute inset-y-0 left-0 w-1.5 ${style.strip}`} />
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className={`inline-flex items-center gap-2 text-sm font-black uppercase tracking-wide ${style.label}`}>
+                <Icon name={session.id} />
+                {session.label}
+              </p>
               <span className={`rounded-full px-2 py-1 text-sm font-bold ${style.time}`}>{entry.time || "Time TBC"}</span>
             </div>
             <p className={`whitespace-pre-wrap text-base font-semibold leading-relaxed ${style.plan}`}>{entry.plan || "-"}</p>

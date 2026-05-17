@@ -39,9 +39,9 @@ const sessionStyles = {
   },
   night: {
     card: "border-slate-200 bg-white",
-    strip: "bg-slate-900",
+    strip: "bg-slate-400",
     label: "text-teal-700",
-    time: "bg-slate-900 text-white",
+    time: "bg-slate-100 text-slate-700",
     plan: "text-slate-950"
   }
 };

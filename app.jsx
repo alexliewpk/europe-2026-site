@@ -1070,18 +1070,6 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
       </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Date</p>
-        <div className="mt-3 grid gap-2">
-          {byDate.length ? byDate.map((entry) => (
-            <div key={entry.date} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-              <span className="font-bold text-slate-700">{entry.date}</span>
-              <span className="font-black text-slate-950">{money(entry.total)}</span>
-            </div>
-          )) : <p className="text-base font-semibold text-slate-500">Add an expense to see statistics.</p>}
-        </div>
-      </section>
-
-      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
         <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Expenses summary</p>
         <div className="mt-3 grid gap-3">
           {filteredExpenses.length ? filteredExpenses.map((expense) => (

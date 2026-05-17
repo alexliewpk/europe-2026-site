@@ -419,7 +419,6 @@ function App() {
   const importInputRef = useRef(null);
   const skipNextSharedSaveRef = useRef(false);
 
-  const isEditMode = false;
   const dateOptions = useMemo(() => [...new Set(items.map((item) => item.date).filter(Boolean))], [items]);
   const placeOptions = useMemo(() => [...new Set(items.map((item) => item.place).filter(Boolean))], [items]);
   const filteredItems = useMemo(
@@ -752,16 +751,13 @@ function App() {
             <ItineraryCards
               columns={columns}
               items={filteredItems}
-              isEditMode={isEditMode}
               onEdit={setEditingItem}
             />
 
             <ItineraryTable
               columns={columns}
               items={filteredItems}
-              isEditMode={isEditMode}
               onEdit={setEditingItem}
-              onRemoveColumn={removeColumn}
             />
           </>
         )}
@@ -1346,7 +1342,7 @@ function FilterBar({
   );
 }
 
-function ItineraryCards({ columns, items, isEditMode, onEdit }) {
+function ItineraryCards({ columns, items, onEdit }) {
   return (
     <section className="grid gap-4 lg:hidden">
       {items.map((item) => (
@@ -1356,7 +1352,12 @@ function ItineraryCards({ columns, items, isEditMode, onEdit }) {
               <p className="text-lg font-black text-slate-950">{item.date || "Date not set"}</p>
               <p className="mt-1 text-xl font-black text-teal-800">{item.place || "Place not set"}</p>
             </div>
-            <span className="rounded-full bg-amber-100 px-3 py-1 text-sm font-bold text-amber-800">3 sessions</span>
+            <div className="grid shrink-0 gap-2">
+              <span className="rounded-full bg-amber-100 px-3 py-1 text-center text-sm font-bold text-amber-800">3 sessions</span>
+              <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={() => onEdit(item)}>
+                Edit
+              </button>
+            </div>
           </div>
 
           <SessionDisplay sessions={item.sessions} />
@@ -1369,18 +1370,13 @@ function ItineraryCards({ columns, items, isEditMode, onEdit }) {
               ))}
           </div>
 
-          {isEditMode && (
-            <div className="mt-4 grid gap-2">
-              <button className="btn-soft" onClick={() => onEdit(item)}>Edit</button>
-            </div>
-          )}
         </article>
       ))}
     </section>
   );
 }
 
-function ItineraryTable({ columns, items, isEditMode, onEdit, onRemoveColumn }) {
+function ItineraryTable({ columns, items, onEdit }) {
   return (
     <section className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft lg:block">
       <div className="overflow-x-auto">
@@ -1391,20 +1387,11 @@ function ItineraryTable({ columns, items, isEditMode, onEdit, onRemoveColumn }) 
                 <th key={column.id} className="border-b border-slate-200 px-4 py-3 font-black">
                   <div className="flex items-center gap-2">
                     <span>{column.label}</span>
-                    {isEditMode && column.custom && (
-                      <button
-                        className="rounded bg-rose-100 px-2 py-1 text-xs font-black text-rose-700"
-                        onClick={() => onRemoveColumn(column.id)}
-                        title={`Remove ${column.label}`}
-                      >
-                        X
-                      </button>
-                    )}
                   </div>
                 </th>
               ))}
               <th className="border-b border-slate-200 px-4 py-3 font-black">Sessions</th>
-              {isEditMode && <th className="border-b border-slate-200 px-4 py-3 font-black">Actions</th>}
+              <th className="border-b border-slate-200 px-4 py-3 font-black">Edit</th>
             </tr>
           </thead>
           <tbody>
@@ -1420,13 +1407,9 @@ function ItineraryTable({ columns, items, isEditMode, onEdit, onRemoveColumn }) 
                 <td className="border-b border-slate-200 px-4 py-4">
                   <SessionDisplay sessions={item.sessions} compact />
                 </td>
-                {isEditMode && (
-                  <td className="border-b border-slate-200 px-4 py-4">
-                    <div className="flex gap-2">
-                      <button className="btn-soft px-3 py-2" onClick={() => onEdit(item)}>Edit</button>
-                    </div>
-                  </td>
-                )}
+                <td className="border-b border-slate-200 px-4 py-4">
+                  <button className="btn-soft px-3 py-2" type="button" onClick={() => onEdit(item)}>Edit</button>
+                </td>
               </tr>
             ))}
           </tbody>

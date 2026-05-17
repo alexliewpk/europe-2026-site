@@ -700,7 +700,7 @@ function App() {
 
       <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
         {page === "expenses" ? (
-          <ExpensesPage expenses={expenses} setExpenses={setExpenses} />
+          <ExpensesPage expenses={expenses} setExpenses={setExpenses} dateOptions={dateOptions} />
         ) : (
           <>
             <FilterBar
@@ -770,7 +770,7 @@ function TopBar({ tripName, setTripName, page }) {
   );
 }
 
-function ExpensesPage({ expenses, setExpenses }) {
+function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   const [draft, setDraft] = useState(createEmptyExpense);
   const total = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
   const byType = EXPENSE_TYPES.map((type) => ({
@@ -813,12 +813,16 @@ function ExpensesPage({ expenses, setExpenses }) {
         <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]" onSubmit={addExpense}>
           <label className="field-label">
             Date
-            <input
+            <select
               className="field-input"
               value={draft.date}
               onChange={(event) => updateDraft("date", event.target.value)}
-              placeholder="Example: 26 May"
-            />
+            >
+              <option value="">Choose date</option>
+              {dateOptions.map((date) => (
+                <option key={date} value={date}>{date}</option>
+              ))}
+            </select>
           </label>
           <label className="field-label">
             Type of expenses

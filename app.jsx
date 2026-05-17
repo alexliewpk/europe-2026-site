@@ -1,7 +1,8 @@
 const { useEffect, useMemo, useRef, useState } = React;
 
 const STORAGE_KEY = "travel-itinerary-v2";
-const EXPENSE_TYPES = ["Food", "Transport", "Hotel", "Ticket", "Shopping", "Other"];
+const EXPENSE_TYPES = ["Food", "Transport", "Ticket", "Shopping", "WC", "Snacks", "Convenient store", "Other"];
+const PAY_BY_OPTIONS = ["PK", "CY"];
 const CURRENCY_OPTIONS = ["MYR", "EUR", "HUF", "CZK"];
 const FALLBACK_RATES_TO_MYR = {
   MYR: 1,
@@ -204,6 +205,7 @@ function createEmptyExpense() {
     id: crypto.randomUUID(),
     date: "",
     type: "Food",
+    payBy: "PK",
     currency: "MYR",
     amount: "",
     amountMyr: "",
@@ -214,12 +216,14 @@ function createEmptyExpense() {
 
 function normalizeExpense(expense) {
   const currency = expense?.currency || "MYR";
+  const payBy = expense?.payBy || "PK";
   const rateToMyr = Number(expense?.rateToMyr || FALLBACK_RATES_TO_MYR[currency] || 1);
   const amount = Number(expense?.amount || 0);
   return {
     ...createEmptyExpense(),
     ...expense,
     id: expense?.id || crypto.randomUUID(),
+    payBy,
     currency,
     rateToMyr,
     amountMyr: Number(expense?.amountMyr || amount * rateToMyr)
@@ -796,6 +800,7 @@ function TopBar({ tripName, setTripName, page }) {
 
 function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   const [draft, setDraft] = useState(createEmptyExpense);
+  const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [ratesToMyr, setRatesToMyr] = useState(FALLBACK_RATES_TO_MYR);
   const [rateStatus, setRateStatus] = useState("Using backup rates");
   const total = expenses.reduce((sum, expense) => sum + expenseMyr(expense), 0);
@@ -813,6 +818,12 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         .reduce((sum, expense) => sum + expenseMyr(expense), 0)
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+  const byPay = PAY_BY_OPTIONS.map((payBy) => ({
+    payBy,
+    total: expenses
+      .filter((expense) => expense.payBy === payBy)
+      .reduce((sum, expense) => sum + expenseMyr(expense), 0)
+  })).filter((entry) => entry.total > 0);
   const convertedDraftAmount = Number(draft.amount || 0) * Number(ratesToMyr[draft.currency] || 1);
 
   useEffect(() => {
@@ -864,8 +875,20 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
     setDraft(createEmptyExpense());
   }
 
+  function saveExpense(expense) {
+    const rateToMyr = Number(expense.rateToMyr || ratesToMyr[expense.currency] || 1);
+    const nextExpense = normalizeExpense({
+      ...expense,
+      rateToMyr,
+      amountMyr: Number(expense.amount || 0) * rateToMyr
+    });
+    setExpenses((current) => current.map((entry) => (entry.id === nextExpense.id ? nextExpense : entry)));
+    setEditingExpenseId(null);
+  }
+
   function deleteExpense(id) {
     setExpenses((current) => current.filter((expense) => expense.id !== id));
+    if (editingExpenseId === id) setEditingExpenseId(null);
   }
 
   return (
@@ -874,7 +897,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Expenses</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950">Add trip expense</h2>
 
-        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_auto]" onSubmit={addExpense}>
+        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" onSubmit={addExpense}>
           <label className="field-label">
             Date
             <select
@@ -911,6 +934,18 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
             />
           </label>
           <label className="field-label">
+            Pay by
+            <select
+              className="field-input"
+              value={draft.payBy}
+              onChange={(event) => updateDraft("payBy", event.target.value)}
+            >
+              {PAY_BY_OPTIONS.map((payBy) => (
+                <option key={payBy} value={payBy}>{payBy}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field-label">
             Currency
             <select
               className="field-input"
@@ -925,10 +960,10 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
           <button className="btn-primary self-end" type="submit">
             Add
           </button>
-          <p className="text-sm font-semibold text-slate-500 md:col-span-5">
+          <p className="text-sm font-semibold text-slate-500 md:col-span-6">
             MYR record: <span className="font-black text-slate-950">{money(convertedDraftAmount)}</span> · {rateStatus}
           </p>
-          <label className="field-label md:col-span-5">
+          <label className="field-label md:col-span-6">
             Notes
             <input
               className="field-input"
@@ -940,7 +975,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         </form>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+      <div className="grid gap-4 lg:grid-cols-3">
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
           <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total</p>
           <p className="mt-1 text-4xl font-black text-slate-950">{money(total)}</p>
@@ -956,6 +991,18 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
                 <span className="font-black text-slate-950">{money(entry.total)}</span>
               </div>
             )) : <p className="text-base font-semibold text-slate-500">No expenses yet.</p>}
+          </div>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Pay</p>
+          <div className="mt-3 grid gap-2">
+            {byPay.length ? byPay.map((entry) => (
+              <div key={entry.payBy} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                <span className="font-bold text-slate-700">{entry.payBy}</span>
+                <span className="font-black text-slate-950">{money(entry.total)}</span>
+              </div>
+            )) : <p className="text-base font-semibold text-slate-500">No payment records yet.</p>}
           </div>
         </section>
       </div>
@@ -976,20 +1023,118 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Expense List</p>
         <div className="mt-3 grid gap-3">
           {expenses.length ? expenses.map((expense) => (
-            <div key={expense.id} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_auto] sm:items-center">
-              <p className="font-black text-slate-950">{expense.date || "-"}</p>
-              <p className="font-bold text-teal-800">{expense.type || "-"}</p>
-              <p className="font-bold text-slate-700">{money(expense.amount, expense.currency)}</p>
-              <p className="font-black text-slate-950">{money(expenseMyr(expense))}</p>
-              <button className="btn-danger px-3 py-2 text-sm" type="button" onClick={() => deleteExpense(expense.id)}>
-                Delete
-              </button>
-              {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-5">{expense.notes}</p>}
-            </div>
+            <ExpenseRow
+              key={expense.id}
+              expense={expense}
+              dateOptions={dateOptions}
+              isEditing={editingExpenseId === expense.id}
+              onEdit={() => setEditingExpenseId(expense.id)}
+              onCancel={() => setEditingExpenseId(null)}
+              onSave={saveExpense}
+              onDelete={deleteExpense}
+            />
           )) : <p className="text-base font-semibold text-slate-500">No expenses added yet.</p>}
         </div>
       </section>
     </section>
+  );
+}
+
+function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave, onDelete }) {
+  const [draft, setDraft] = useState(() => normalizeExpense(expense));
+
+  useEffect(() => {
+    setDraft(normalizeExpense(expense));
+  }, [expense, isEditing]);
+
+  function updateDraft(field, value) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  if (isEditing) {
+    return (
+      <form
+        className="grid gap-3 rounded-lg border border-teal-200 bg-teal-50 p-3 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr]"
+        onSubmit={(event) => {
+          event.preventDefault();
+          onSave(draft);
+        }}
+      >
+        <label className="field-label">
+          Date
+          <select className="field-input" value={draft.date} onChange={(event) => updateDraft("date", event.target.value)}>
+            <option value="">Choose date</option>
+            {dateOptions.map((date) => (
+              <option key={date} value={date}>{date}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          Type
+          <select className="field-input" value={draft.type} onChange={(event) => updateDraft("type", event.target.value)}>
+            {EXPENSE_TYPES.map((type) => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          Amount
+          <input
+            className="field-input"
+            inputMode="decimal"
+            value={draft.amount}
+            onChange={(event) => updateDraft("amount", event.target.value)}
+          />
+        </label>
+        <label className="field-label">
+          Currency
+          <select className="field-input" value={draft.currency} onChange={(event) => updateDraft("currency", event.target.value)}>
+            {CURRENCY_OPTIONS.map((currency) => (
+              <option key={currency} value={currency}>{currency}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          Pay by
+          <select className="field-input" value={draft.payBy} onChange={(event) => updateDraft("payBy", event.target.value)}>
+            {PAY_BY_OPTIONS.map((payBy) => (
+              <option key={payBy} value={payBy}>{payBy}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label lg:col-span-5">
+          Notes
+          <input
+            className="field-input"
+            value={draft.notes}
+            onChange={(event) => updateDraft("notes", event.target.value)}
+          />
+        </label>
+        <div className="grid gap-2 sm:grid-cols-2 lg:col-span-5">
+          <button className="btn-soft" type="button" onClick={onCancel}>Cancel</button>
+          <button className="btn-primary" type="submit">Save</button>
+        </div>
+      </form>
+    );
+  }
+
+  return (
+    <div className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] sm:items-center">
+      <p className="font-black text-slate-950">{expense.date || "-"}</p>
+      <p className="font-bold text-teal-800">{expense.type || "-"}</p>
+      <p className="font-bold text-slate-700">{expense.payBy || "PK"}</p>
+      <p className="font-bold text-slate-700">{money(expense.amount, expense.currency)}</p>
+      <p className="font-black text-slate-950">{money(expenseMyr(expense))}</p>
+      <div className="grid grid-cols-2 gap-2">
+        <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={onEdit}>
+          Edit
+        </button>
+        <button className="btn-danger px-3 py-2 text-sm" type="button" onClick={() => onDelete(expense.id)}>
+          Delete
+        </button>
+      </div>
+      {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-6">{expense.notes}</p>}
+    </div>
   );
 }
 

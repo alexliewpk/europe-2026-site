@@ -925,127 +925,118 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Expenses</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950">Add trip expense</h2>
 
-        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_auto]" onSubmit={addExpense}>
-          <label className="field-label">
-            Date
-            <select
-              className="field-input"
-              value={draft.date}
-              onChange={(event) => updateDraft("date", event.target.value)}
-            >
-              <option value="">Choose date</option>
-              {dateOptions.map((date) => (
-                <option key={date} value={date}>{date}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label">
-            Country
-            <select
-              className="field-input"
-              value={draft.country}
-              onChange={(event) => updateDraft("country", event.target.value)}
-            >
-              {COUNTRY_OPTIONS.map((country) => (
-                <option key={country} value={country}>{country}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label">
-            Type of expenses
-            <select
-              className="field-input"
-              value={draft.type}
-              onChange={(event) => updateDraft("type", event.target.value)}
-            >
-              {EXPENSE_TYPES.map((type) => (
-                <option key={type} value={type}>{type}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label">
-            Amount
-            <input
-              className="field-input"
-              inputMode="decimal"
-              value={draft.amount}
-              onChange={(event) => updateDraft("amount", event.target.value)}
-              placeholder="0.00"
-            />
-          </label>
-          <label className="field-label">
-            Pay by
-            <select
-              className="field-input"
-              value={draft.payBy}
-              onChange={(event) => updateDraft("payBy", event.target.value)}
-            >
-              {PAY_BY_OPTIONS.map((payBy) => (
-                <option key={payBy} value={payBy}>{payBy}</option>
-              ))}
-            </select>
-          </label>
-          <label className="field-label">
-            Currency
-            <select
-              className="field-input"
-              value={draft.currency}
-              onChange={(event) => updateDraft("currency", event.target.value)}
-            >
-              {CURRENCY_OPTIONS.map((currency) => (
-                <option key={currency} value={currency}>{currency}</option>
-              ))}
-            </select>
-          </label>
-          <button className="btn-primary self-end" type="submit">
-            Add
-          </button>
-          <p className="text-sm font-semibold text-slate-500 md:col-span-7">
-            MYR record: <span className="font-black text-slate-950">{money(convertedDraftAmount)}</span> · {rateStatus}
-          </p>
-          <label className="field-label md:col-span-7">
-            Notes
-            <input
-              className="field-input"
-              value={draft.notes}
-              onChange={(event) => updateDraft("notes", event.target.value)}
-              placeholder="Optional"
-            />
-          </label>
+        <form className="mt-4 grid gap-4" onSubmit={addExpense}>
+          <section className="rounded-lg bg-slate-50 p-3">
+            <p className="text-sm font-black uppercase tracking-wide text-slate-500">When / Where</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-2">
+              <label className="field-label">
+                Date
+                <select
+                  className="field-input"
+                  value={draft.date}
+                  onChange={(event) => updateDraft("date", event.target.value)}
+                >
+                  <option value="">Choose date</option>
+                  {dateOptions.map((date) => (
+                    <option key={date} value={date}>{date}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                Country
+                <select
+                  className="field-input"
+                  value={draft.country}
+                  onChange={(event) => updateDraft("country", event.target.value)}
+                >
+                  {COUNTRY_OPTIONS.map((country) => (
+                    <option key={country} value={country}>{country}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </section>
+
+          <section className="rounded-lg bg-slate-50 p-3">
+            <p className="text-sm font-black uppercase tracking-wide text-slate-500">Expense</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-3">
+              <label className="field-label">
+                Type
+                <select
+                  className="field-input"
+                  value={draft.type}
+                  onChange={(event) => updateDraft("type", event.target.value)}
+                >
+                  {EXPENSE_TYPES.map((type) => (
+                    <option key={type} value={type}>{type}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                Amount
+                <input
+                  className="field-input"
+                  inputMode="decimal"
+                  value={draft.amount}
+                  onChange={(event) => updateDraft("amount", event.target.value)}
+                  placeholder="0.00"
+                />
+              </label>
+              <label className="field-label">
+                Currency
+                <select
+                  className="field-input"
+                  value={draft.currency}
+                  onChange={(event) => updateDraft("currency", event.target.value)}
+                >
+                  {CURRENCY_OPTIONS.map((currency) => (
+                    <option key={currency} value={currency}>{currency}</option>
+                  ))}
+                </select>
+              </label>
+            </div>
+            <p className="mt-3 text-sm font-semibold text-slate-500">
+              MYR record: <span className="font-black text-slate-950">{money(convertedDraftAmount)}</span> · {rateStatus}
+            </p>
+          </section>
+
+          <section className="rounded-lg bg-slate-50 p-3">
+            <p className="text-sm font-black uppercase tracking-wide text-slate-500">Who</p>
+            <div className="mt-3 grid gap-3 md:grid-cols-[1fr_2fr_auto] md:items-end">
+              <label className="field-label">
+                Pay by
+                <select
+                  className="field-input"
+                  value={draft.payBy}
+                  onChange={(event) => updateDraft("payBy", event.target.value)}
+                >
+                  {PAY_BY_OPTIONS.map((payBy) => (
+                    <option key={payBy} value={payBy}>{payBy}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="field-label">
+                Notes
+                <input
+                  className="field-input"
+                  value={draft.notes}
+                  onChange={(event) => updateDraft("notes", event.target.value)}
+                  placeholder="Optional"
+                />
+              </label>
+              <button className="btn-primary" type="submit">
+                Add
+              </button>
+            </div>
+          </section>
         </form>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-3">
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total</p>
-          <p className="mt-1 text-4xl font-black text-slate-950">{money(total)}</p>
-          <p className="mt-1 text-sm font-semibold text-slate-500">All expenses converted to MYR</p>
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Type</p>
-          <div className="mt-3 grid gap-2">
-            {byType.length ? byType.map((entry) => (
-              <div key={entry.type} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <span className="font-bold text-slate-700">{entry.type}</span>
-                <span className="font-black text-slate-950">{money(entry.total)}</span>
-              </div>
-            )) : <p className="text-base font-semibold text-slate-500">No expenses yet.</p>}
-          </div>
-        </section>
-
-        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Pay</p>
-          <div className="mt-3 grid gap-2">
-            {byPay.length ? byPay.map((entry) => (
-              <div key={entry.payBy} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-                <span className="font-bold text-slate-700">{entry.payBy}</span>
-                <span className="font-black text-slate-950">{money(entry.total)}</span>
-              </div>
-            )) : <p className="text-base font-semibold text-slate-500">No payment records yet.</p>}
-          </div>
-        </section>
-      </div>
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total spent</p>
+        <p className="mt-1 text-4xl font-black text-slate-950">{money(total)}</p>
+        <p className="mt-1 text-sm font-semibold text-slate-500">Filtered expenses converted to MYR</p>
+      </section>
 
       <ExpensesFilterBar
         countryFilter={countryFilter}
@@ -1271,17 +1262,35 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave 
   }
 
   return (
-    <div className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_auto] sm:items-center">
-      <p className="font-black text-slate-950">{expense.date || "-"}</p>
-      <p className="font-bold text-slate-700">{expense.country || inferCountryFromDate(expense.date)}</p>
-      <p className="font-bold text-teal-800">{expense.type || "-"}</p>
-      <p className="font-bold text-slate-700">{expense.payBy || "PK"}</p>
-      <p className="font-bold text-slate-700">{money(expense.amount, expense.currency)}</p>
-      <p className="font-black text-slate-950">{money(expenseMyr(expense))}</p>
-      <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={onEdit}>
-        Edit
-      </button>
-      {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-7">{expense.notes}</p>}
+    <div className="rounded-lg border border-slate-200 p-3">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_auto] lg:items-end">
+        <ExpenseValue label="Date" value={expense.date || "-"} strong />
+        <ExpenseValue label="Country" value={expense.country || inferCountryFromDate(expense.date)} />
+        <ExpenseValue label="Type" value={expense.type || "-"} accent />
+        <ExpenseValue label="Paid by" value={expense.payBy || "PK"} />
+        <ExpenseValue label="Amount" value={money(expense.amount, expense.currency)} />
+        <ExpenseValue label="MYR" value={money(expenseMyr(expense))} strong />
+        <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={onEdit}>
+          Edit
+        </button>
+      </div>
+      {expense.notes && (
+        <div className="mt-3 rounded-lg bg-slate-50 p-3">
+          <p className="text-xs font-black uppercase tracking-wide text-slate-500">Notes</p>
+          <p className="mt-1 text-sm font-semibold text-slate-700">{expense.notes}</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExpenseValue({ label, value, strong = false, accent = false }) {
+  return (
+    <div className="rounded-lg bg-slate-50 p-3 lg:bg-transparent lg:p-0">
+      <p className="text-xs font-black uppercase tracking-wide text-slate-500">{label}</p>
+      <p className={`mt-1 text-base ${strong ? "font-black text-slate-950" : accent ? "font-black text-teal-800" : "font-bold text-slate-700"}`}>
+        {value}
+      </p>
     </div>
   );
 }

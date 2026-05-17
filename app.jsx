@@ -1,6 +1,7 @@
 const { useEffect, useMemo, useRef, useState } = React;
 
 const STORAGE_KEY = "travel-itinerary-v2";
+const EXPENSE_TYPES = ["Food", "Transport", "Hotel", "Ticket", "Shopping", "Other"];
 const SUPABASE_TABLE = "trip_itineraries";
 const SUPABASE_ROW_ID = "europe-2026";
 const SUPABASE_URL = "https://xukgdrnqkwuxsmaqwvta.supabase.co";
@@ -191,6 +192,24 @@ function createEmptySessions() {
   }, {});
 }
 
+function createEmptyExpense() {
+  return {
+    id: crypto.randomUUID(),
+    date: "",
+    type: "Food",
+    amount: "",
+    notes: ""
+  };
+}
+
+function normalizeExpense(expense) {
+  return {
+    ...createEmptyExpense(),
+    ...expense,
+    id: expense?.id || crypto.randomUUID()
+  };
+}
+
 function normalizeItem(item) {
   return {
     ...item,
@@ -206,7 +225,8 @@ function readSavedState() {
     tripName: "Europe Trip 2026",
     mode: "view",
     columns: defaultColumns,
-    items: sampleItems
+    items: sampleItems,
+    expenses: []
   };
 
   try {
@@ -216,7 +236,8 @@ function readSavedState() {
       ...fallback,
       ...saved,
       columns: Array.isArray(saved.columns) && saved.columns.length ? visibleColumns(saved.columns) : defaultColumns,
-      items: Array.isArray(saved.items) ? saved.items.map(normalizeItem) : sampleItems
+      items: Array.isArray(saved.items) ? saved.items.map(normalizeItem) : sampleItems,
+      expenses: Array.isArray(saved.expenses) ? saved.expenses.map(normalizeExpense) : []
     };
   } catch {
     return fallback;
@@ -237,11 +258,12 @@ function createSupabaseClient() {
   return window.supabase.createClient(config.url, config.anonKey);
 }
 
-function createSharedData(tripName, columns, items) {
+function createSharedData(tripName, columns, items, expenses) {
   return {
     tripName,
     columns,
-    items: items.map(normalizeItem)
+    items: items.map(normalizeItem),
+    expenses: expenses.map(normalizeExpense)
   };
 }
 
@@ -251,7 +273,8 @@ function normalizeSharedData(data) {
     columns: Array.isArray(data?.columns) && data.columns.length
       ? visibleColumns(data.columns)
       : defaultColumns,
-    items: Array.isArray(data?.items) ? data.items.map(normalizeItem) : sampleItems
+    items: Array.isArray(data?.items) ? data.items.map(normalizeItem) : sampleItems,
+    expenses: Array.isArray(data?.expenses) ? data.expenses.map(normalizeExpense) : []
   };
 }
 
@@ -342,6 +365,8 @@ function App() {
   const [mode, setMode] = useState(() => readSavedState().mode);
   const [columns, setColumns] = useState(() => readSavedState().columns);
   const [items, setItems] = useState(() => readSavedState().items);
+  const [expenses, setExpenses] = useState(() => readSavedState().expenses);
+  const [page, setPage] = useState(() => (window.location.hash === "#expenses" ? "expenses" : "itinerary"));
   const [editingItem, setEditingItem] = useState(null);
   const [columnName, setColumnName] = useState("");
   const [importMessage, setImportMessage] = useState("");
@@ -355,7 +380,7 @@ function App() {
   const importInputRef = useRef(null);
   const skipNextSharedSaveRef = useRef(false);
 
-  const isEditMode = mode === "edit";
+  const isEditMode = false;
   const dateOptions = useMemo(() => [...new Set(items.map((item) => item.date).filter(Boolean))], [items]);
   const placeOptions = useMemo(() => [...new Set(items.map((item) => item.place).filter(Boolean))], [items]);
   const filteredItems = useMemo(
@@ -369,8 +394,17 @@ function App() {
   );
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tripName, mode, columns, items }));
-  }, [tripName, mode, columns, items]);
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ tripName, mode, columns, items, expenses }));
+  }, [tripName, mode, columns, items, expenses]);
+
+  useEffect(() => {
+    function handleHashChange() {
+      setPage(window.location.hash === "#expenses" ? "expenses" : "itinerary");
+    }
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
 
   async function syncFromOnline() {
     const client = createSupabaseClient();
@@ -391,7 +425,7 @@ function App() {
 
     if (error) {
       setSharedStatus("error");
-      setSharedMessage("Could not load the shared itinerary. Try Sync Now again.");
+      setSharedMessage("Could not load the shared itinerary. Refresh the page and try again.");
       return;
     }
 
@@ -406,6 +440,7 @@ function App() {
     setTripName(shared.tripName);
     setColumns(shared.columns);
     setItems(shared.items);
+    setExpenses(shared.expenses);
     setLastRemoteUpdate(data.updated_at || "");
     setSharedStatus("shared");
     setSharedMessage("Loaded the latest shared itinerary.");
@@ -447,12 +482,13 @@ function App() {
         setTripName(shared.tripName);
         setColumns(shared.columns);
         setItems(shared.items);
+        setExpenses(shared.expenses);
         setLastRemoteUpdate(data.updated_at || "");
       } else {
         const firstSavedAt = new Date().toISOString();
         await client.from(SUPABASE_TABLE).upsert({
           id: SUPABASE_ROW_ID,
-          data: createSharedData(savedState.tripName, savedState.columns, savedState.items),
+          data: createSharedData(savedState.tripName, savedState.columns, savedState.items, savedState.expenses),
           updated_at: firstSavedAt
         });
         setLastRemoteUpdate(firstSavedAt);
@@ -489,7 +525,7 @@ function App() {
       const savedAt = new Date().toISOString();
       const { error } = await client.from(SUPABASE_TABLE).upsert({
         id: SUPABASE_ROW_ID,
-        data: createSharedData(tripName, columns, items),
+        data: createSharedData(tripName, columns, items, expenses),
         updated_at: savedAt
       });
 
@@ -505,7 +541,7 @@ function App() {
     }, 500);
 
     return () => clearTimeout(timeoutId);
-  }, [tripName, columns, items, sharedReady, hasLoadedShared]);
+  }, [tripName, columns, items, expenses, sharedReady, hasLoadedShared]);
 
   useEffect(() => {
     if (!sharedReady || !hasLoadedShared) return;
@@ -529,6 +565,7 @@ function App() {
       setTripName(shared.tripName);
       setColumns(shared.columns);
       setItems(shared.items);
+      setExpenses(shared.expenses);
       setLastRemoteUpdate(data.updated_at);
       setSharedStatus("shared");
       setSharedMessage("Updated from shared online save.");
@@ -536,10 +573,6 @@ function App() {
 
     return () => clearInterval(intervalId);
   }, [sharedReady, hasLoadedShared, lastRemoteUpdate, editingItem]);
-
-  function openNewItem() {
-    setEditingItem(createEmptyItem(columns));
-  }
 
   function saveItem(item) {
     setItems((current) => {
@@ -574,14 +607,6 @@ function App() {
       delete next[columnId];
       return next;
     }));
-  }
-
-  function resetSampleData() {
-    setTripName("Europe Trip 2026");
-    setColumns(defaultColumns);
-    setItems(sampleItems);
-    setMode("view");
-    setEditingItem(null);
   }
 
   function exportExcel() {
@@ -670,41 +695,43 @@ function App() {
       <TopBar
         tripName={tripName}
         setTripName={setTripName}
-        isEditMode={isEditMode}
-        setMode={setMode}
-        openNewItem={openNewItem}
+        page={page}
       />
 
       <main className="mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
-        <SaveStatus status={sharedStatus} message={sharedMessage} onSync={syncFromOnline} />
+        {page === "expenses" ? (
+          <ExpensesPage expenses={expenses} setExpenses={setExpenses} />
+        ) : (
+          <>
+            <FilterBar
+              dateFilter={dateFilter}
+              setDateFilter={setDateFilter}
+              placeFilter={placeFilter}
+              setPlaceFilter={setPlaceFilter}
+              dateOptions={dateOptions}
+              placeOptions={placeOptions}
+              resultCount={filteredItems.length}
+              totalCount={items.length}
+            />
 
-        <FilterBar
-          dateFilter={dateFilter}
-          setDateFilter={setDateFilter}
-          placeFilter={placeFilter}
-          setPlaceFilter={setPlaceFilter}
-          dateOptions={dateOptions}
-          placeOptions={placeOptions}
-          resultCount={filteredItems.length}
-          totalCount={items.length}
-        />
+            <ItineraryCards
+              columns={columns}
+              items={filteredItems}
+              isEditMode={isEditMode}
+              onEdit={setEditingItem}
+              onDelete={deleteItem}
+            />
 
-        <ItineraryCards
-          columns={columns}
-          items={filteredItems}
-          isEditMode={isEditMode}
-          onEdit={setEditingItem}
-          onDelete={deleteItem}
-        />
-
-        <ItineraryTable
-          columns={columns}
-          items={filteredItems}
-          isEditMode={isEditMode}
-          onEdit={setEditingItem}
-          onDelete={deleteItem}
-          onRemoveColumn={removeColumn}
-        />
+            <ItineraryTable
+              columns={columns}
+              items={filteredItems}
+              isEditMode={isEditMode}
+              onEdit={setEditingItem}
+              onDelete={deleteItem}
+              onRemoveColumn={removeColumn}
+            />
+          </>
+        )}
       </main>
 
       {editingItem && (
@@ -719,7 +746,7 @@ function App() {
   );
 }
 
-function TopBar({ tripName, setTripName, isEditMode, setMode, openNewItem }) {
+function TopBar({ tripName, setTripName, page }) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
@@ -732,41 +759,155 @@ function TopBar({ tripName, setTripName, isEditMode, setMode, openNewItem }) {
             aria-label="Trip name"
           />
         </div>
-        <div className="flex gap-2">
-          <button
-            className={`flex-1 rounded-lg px-4 py-3 text-base font-bold sm:flex-none ${isEditMode ? "bg-slate-900 text-white" : "bg-teal-700 text-white"}`}
-            onClick={() => setMode(isEditMode ? "view" : "edit")}
-          >
-            {isEditMode ? "View Mode" : "Edit Mode"}
-          </button>
-          {isEditMode && (
-            <button className="btn-primary flex-1 sm:flex-none" onClick={openNewItem}>
-              Add
-            </button>
-          )}
-        </div>
+        <a
+          className="btn-primary flex items-center justify-center text-center"
+          href={page === "expenses" ? "#" : "#expenses"}
+        >
+          {page === "expenses" ? "Itinerary" : "Expenses"}
+        </a>
       </div>
     </header>
   );
 }
 
-function SaveStatus({ status, message, onSync }) {
-  const styles = {
-    checking: "border-slate-200 bg-white text-slate-700",
-    syncing: "border-amber-200 bg-amber-50 text-amber-900",
-    shared: "border-teal-200 bg-teal-50 text-teal-900",
-    local: "border-slate-200 bg-white text-slate-700",
-    error: "border-rose-200 bg-rose-50 text-rose-900"
-  };
-  const label = status === "shared" ? "Shared Online" : status === "syncing" ? "Syncing" : status === "error" ? "Needs Setup" : "This Device Only";
+function ExpensesPage({ expenses, setExpenses }) {
+  const [draft, setDraft] = useState(createEmptyExpense);
+  const total = expenses.reduce((sum, expense) => sum + Number(expense.amount || 0), 0);
+  const byType = EXPENSE_TYPES.map((type) => ({
+    type,
+    total: expenses
+      .filter((expense) => expense.type === type)
+      .reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
+  })).filter((entry) => entry.total > 0);
+  const byDate = [...new Set(expenses.map((expense) => expense.date).filter(Boolean))]
+    .map((date) => ({
+      date,
+      total: expenses
+        .filter((expense) => expense.date === date)
+        .reduce((sum, expense) => sum + Number(expense.amount || 0), 0)
+    }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  function updateDraft(field, value) {
+    setDraft((current) => ({ ...current, [field]: value }));
+  }
+
+  function addExpense(event) {
+    event.preventDefault();
+    if (!draft.date || !draft.type || !draft.amount) return;
+
+    setExpenses((current) => [...current, normalizeExpense(draft)]);
+    setDraft(createEmptyExpense());
+  }
+
+  function deleteExpense(id) {
+    setExpenses((current) => current.filter((expense) => expense.id !== id));
+  }
 
   return (
-    <div className={`mb-5 grid gap-3 rounded-lg border px-4 py-3 text-base font-semibold sm:grid-cols-[1fr_auto] sm:items-center ${styles[status] || styles.local}`}>
-      <p><span className="font-black">{label}:</span> {message}</p>
-      <button className="btn-soft bg-white px-3 py-2" type="button" onClick={onSync}>
-        Sync Now
-      </button>
-    </div>
+    <section className="grid gap-5">
+      <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+        <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Expenses</p>
+        <h2 className="mt-1 text-2xl font-black text-slate-950">Add trip expense</h2>
+
+        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto]" onSubmit={addExpense}>
+          <label className="field-label">
+            Date
+            <input
+              className="field-input"
+              value={draft.date}
+              onChange={(event) => updateDraft("date", event.target.value)}
+              placeholder="Example: 26 May"
+            />
+          </label>
+          <label className="field-label">
+            Type of expenses
+            <select
+              className="field-input"
+              value={draft.type}
+              onChange={(event) => updateDraft("type", event.target.value)}
+            >
+              {EXPENSE_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field-label">
+            Amount
+            <input
+              className="field-input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={draft.amount}
+              onChange={(event) => updateDraft("amount", event.target.value)}
+              placeholder="0.00"
+            />
+          </label>
+          <button className="btn-primary self-end" type="submit">
+            Add
+          </button>
+          <label className="field-label md:col-span-4">
+            Notes
+            <input
+              className="field-input"
+              value={draft.notes}
+              onChange={(event) => updateDraft("notes", event.target.value)}
+              placeholder="Optional"
+            />
+          </label>
+        </form>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total</p>
+          <p className="mt-1 text-4xl font-black text-slate-950">{total.toFixed(2)}</p>
+          <p className="mt-1 text-sm font-semibold text-slate-500">All expenses entered</p>
+        </section>
+
+        <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+          <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Type</p>
+          <div className="mt-3 grid gap-2">
+            {byType.length ? byType.map((entry) => (
+              <div key={entry.type} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+                <span className="font-bold text-slate-700">{entry.type}</span>
+                <span className="font-black text-slate-950">{entry.total.toFixed(2)}</span>
+              </div>
+            )) : <p className="text-base font-semibold text-slate-500">No expenses yet.</p>}
+          </div>
+        </section>
+      </div>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Date</p>
+        <div className="mt-3 grid gap-2">
+          {byDate.length ? byDate.map((entry) => (
+            <div key={entry.date} className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
+              <span className="font-bold text-slate-700">{entry.date}</span>
+              <span className="font-black text-slate-950">{entry.total.toFixed(2)}</span>
+            </div>
+          )) : <p className="text-base font-semibold text-slate-500">Add an expense to see statistics.</p>}
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
+        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Expense List</p>
+        <div className="mt-3 grid gap-3">
+          {expenses.length ? expenses.map((expense) => (
+            <div key={expense.id} className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_auto] sm:items-center">
+              <p className="font-black text-slate-950">{expense.date || "-"}</p>
+              <p className="font-bold text-teal-800">{expense.type || "-"}</p>
+              <p className="font-black text-slate-950">{Number(expense.amount || 0).toFixed(2)}</p>
+              <button className="btn-danger px-3 py-2 text-sm" type="button" onClick={() => deleteExpense(expense.id)}>
+                Delete
+              </button>
+              {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-4">{expense.notes}</p>}
+            </div>
+          )) : <p className="text-base font-semibold text-slate-500">No expenses added yet.</p>}
+        </div>
+      </section>
+    </section>
   );
 }
 
@@ -815,59 +956,6 @@ function FilterBar({
         </button>
         <p className="text-sm font-bold text-slate-500 md:text-right">
           Showing {resultCount} of {totalCount}
-        </p>
-      </div>
-    </section>
-  );
-}
-
-function SummaryCard({ label, value }) {
-  return (
-    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{label}</p>
-      <p className="mt-1 text-2xl font-black text-slate-950">{value}</p>
-    </div>
-  );
-}
-
-function EditControls({ columnName, setColumnName, addColumn, resetSampleData, exportExcel, importExcelFile, importInputRef, importMessage }) {
-  return (
-    <section className="mb-5 rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <div className="grid gap-3 lg:grid-cols-[1fr_auto] lg:items-end">
-        <form className="grid gap-3 sm:grid-cols-[1fr_auto]" onSubmit={addColumn}>
-          <label className="field-label">
-            Add custom column
-            <input
-              className="field-input"
-              value={columnName}
-              onChange={(event) => setColumnName(event.target.value)}
-              placeholder="Example: Booking Ref, Hotel, Food"
-            />
-          </label>
-          <button className="btn-soft" type="submit">
-            Add Column
-          </button>
-        </form>
-        <button className="btn-soft" onClick={resetSampleData}>
-          Reload Sample
-        </button>
-      </div>
-      <div className="mt-4 grid gap-3 border-t border-slate-200 pt-4 sm:grid-cols-[auto_auto_1fr] sm:items-center">
-        <button className="btn-primary" type="button" onClick={exportExcel}>
-          Export Excel
-        </button>
-        <button className="btn-soft" type="button" onClick={() => importInputRef.current?.click()}>
-          Import Excel CSV
-        </button>
-        <input
-          ref={importInputRef}
-          className="hidden"
-          type="file"
-          accept=".csv,text/csv"
-          onChange={importExcelFile}
-        />
-        <p className="text-sm font-semibold text-slate-500">
-          {importMessage || "Excel export uses CSV, which opens cleanly in Microsoft Excel."}
         </p>
       </div>
     </section>

@@ -725,7 +725,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[linear-gradient(135deg,#f8fafc_0%,#f5f1e8_52%,#eff6f3_100%)]">
+    <div className="min-h-screen bg-[#f5f5f7]">
       <TopBar
         tripName={tripName}
         setTripName={setTripName}
@@ -777,10 +777,12 @@ function App() {
 
 function TopBar({ tripName, setTripName, page }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 shadow-sm backdrop-blur">
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/85 shadow-sm backdrop-blur-xl">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
         <div className="min-w-0">
-          <p className="text-xs font-bold uppercase tracking-wide text-teal-700">Travel Planner</p>
+          <p className="inline-flex items-center gap-2 text-xs font-bold uppercase tracking-wide text-teal-700">
+            <Icon name="plane" /> Travel Planner
+          </p>
           <input
             className="mt-1 w-full min-w-0 rounded-md border border-transparent bg-transparent text-2xl font-black text-slate-950 outline-none focus:border-teal-200 focus:bg-teal-50 sm:text-3xl"
             value={tripName}
@@ -788,14 +790,43 @@ function TopBar({ tripName, setTripName, page }) {
             aria-label="Trip name"
           />
         </div>
-        <a
-          className="btn-primary flex items-center justify-center text-center"
-          href={page === "expenses" ? "#" : "#expenses"}
-        >
-          {page === "expenses" ? "Itinerary" : "Expenses"}
-        </a>
+        <nav className="grid grid-cols-2 rounded-lg bg-slate-100 p-1 text-sm font-black text-slate-600 shadow-inner sm:w-[320px]">
+          <a
+            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 transition ${page === "expenses" ? "hover:bg-white/70" : "bg-white text-slate-950 shadow-sm"}`}
+            href="#"
+          >
+            <Icon name="calendar" /> Itinerary
+          </a>
+          <a
+            className={`inline-flex items-center justify-center gap-2 rounded-md px-3 py-2 transition ${page === "expenses" ? "bg-white text-slate-950 shadow-sm" : "hover:bg-white/70"}`}
+            href="#expenses"
+          >
+            <Icon name="wallet" /> Expenses
+          </a>
+        </nav>
       </div>
     </header>
+  );
+}
+
+function Icon({ name, className = "h-4 w-4" }) {
+  const icons = {
+    plane: <path d="M3 12h6l6-8h3l-4 8h5l2-3h2l-1.5 4L23 17h-2l-2-3h-5l4 8h-3l-6-8H3z" />,
+    calendar: <><rect x="3" y="5" width="18" height="16" rx="2" /><path d="M16 3v4M8 3v4M3 11h18" /></>,
+    wallet: <><path d="M4 7h16a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h14" /><path d="M18 13h4v4h-4a2 2 0 0 1 0-4z" /></>,
+    edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z" /></>,
+    plus: <path d="M12 5v14M5 12h14" />,
+    filter: <path d="M4 5h16M7 12h10M10 19h4" />,
+    chart: <><path d="M4 19V5" /><path d="M8 17V9" /><path d="M13 17V6" /><path d="M18 17v-4" /><path d="M3 19h18" /></>,
+    total: <path d="M7 7h10M7 12h10M7 17h6" />,
+    user: <><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></>,
+    globe: <><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" /></>
+  };
+
+  return (
+    <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {icons[name] || icons.calendar}
+    </svg>
   );
 }
 
@@ -918,12 +949,16 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   return (
     <section className="grid gap-5">
       <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-        <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Expenses</p>
+        <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-teal-700">
+          <Icon name="wallet" /> Expenses
+        </p>
         <h2 className="mt-1 text-2xl font-black text-slate-950">Add trip expense</h2>
 
         <form className="mt-4 grid gap-4" onSubmit={addExpense}>
           <section className="rounded-lg bg-slate-50 p-3">
-            <p className="text-sm font-black uppercase tracking-wide text-slate-500">When / Where</p>
+            <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-wide text-slate-500">
+              <Icon name="globe" /> When / Where
+            </p>
             <div className="mt-3 grid gap-3 md:grid-cols-2">
               <label className="field-label">
                 Date
@@ -954,7 +989,9 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
           </section>
 
           <section className="rounded-lg bg-slate-50 p-3">
-            <p className="text-sm font-black uppercase tracking-wide text-slate-500">Expense</p>
+            <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-wide text-slate-500">
+              <Icon name="wallet" /> Expense
+            </p>
             <div className="mt-3 grid gap-3 md:grid-cols-3">
               <label className="field-label">
                 Type
@@ -997,7 +1034,9 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
           </section>
 
           <section className="rounded-lg bg-slate-50 p-3">
-            <p className="text-sm font-black uppercase tracking-wide text-slate-500">Who</p>
+            <p className="inline-flex items-center gap-2 text-sm font-black uppercase tracking-wide text-slate-500">
+              <Icon name="user" /> Who
+            </p>
             <div className="mt-3 grid gap-3 md:grid-cols-[1fr_2fr_auto] md:items-end">
               <label className="field-label">
                 Pay by
@@ -1021,6 +1060,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
                 />
               </label>
               <button className="btn-primary" type="submit">
+                <Icon name="plus" />
                 Add
               </button>
             </div>
@@ -1029,7 +1069,9 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
       </div>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-        <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Total spent</p>
+        <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+          <Icon name="total" /> Total spent
+        </p>
         <p className="mt-1 text-4xl font-black text-slate-950">{money(total)}</p>
         <p className="mt-1 text-sm font-semibold text-slate-500">Filtered expenses converted to MYR</p>
       </section>
@@ -1092,7 +1134,9 @@ function ExpensesFilterBar({
 }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Filter by country, date, types, people</p>
+      <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+        <Icon name="filter" /> Filter by country, date, types, people
+      </p>
       <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto_auto] xl:items-end">
         <label className="field-label">
           Country
@@ -1131,6 +1175,7 @@ function ExpensesFilterBar({
           </select>
         </label>
         <button className="btn-soft" type="button" onClick={onClear}>
+          <Icon name="filter" />
           Clear
         </button>
         <p className="text-sm font-bold text-slate-500 md:text-right">
@@ -1146,7 +1191,9 @@ function ExpenseGraph({ title, data }) {
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</p>
+      <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-500">
+        <Icon name="chart" /> {title}
+      </p>
       <div className="mt-4 grid gap-3">
         {data.length ? data.map((entry) => {
           const label = entry.country || entry.date || entry.type || entry.payBy;
@@ -1251,7 +1298,10 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave 
         </label>
         <div className="grid gap-2 sm:grid-cols-2 lg:col-span-6">
           <button className="btn-soft" type="button" onClick={onCancel}>Cancel</button>
-          <button className="btn-primary" type="submit">Save</button>
+          <button className="btn-primary" type="submit">
+            <Icon name="edit" />
+            Save
+          </button>
         </div>
       </form>
     );
@@ -1267,6 +1317,7 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave 
         <ExpenseValue label="Amount" value={money(expense.amount, expense.currency)} />
         <ExpenseValue label="MYR" value={money(expenseMyr(expense))} strong />
         <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={onEdit}>
+          <Icon name="edit" />
           Edit
         </button>
       </div>
@@ -1332,6 +1383,7 @@ function FilterBar({
           </select>
         </label>
         <button className="btn-soft" type="button" onClick={clearFilters}>
+          <Icon name="filter" />
           Clear
         </button>
         <p className="text-sm font-bold text-slate-500 md:text-right">
@@ -1355,6 +1407,7 @@ function ItineraryCards({ columns, items, onEdit }) {
             <div className="grid shrink-0 gap-2">
               <span className="rounded-full bg-amber-100 px-3 py-1 text-center text-sm font-bold text-amber-800">3 sessions</span>
               <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={() => onEdit(item)}>
+                <Icon name="edit" />
                 Edit
               </button>
             </div>
@@ -1408,7 +1461,10 @@ function ItineraryTable({ columns, items, onEdit }) {
                   <SessionDisplay sessions={item.sessions} compact />
                 </td>
                 <td className="border-b border-slate-200 px-4 py-4">
-                  <button className="btn-soft px-3 py-2" type="button" onClick={() => onEdit(item)}>Edit</button>
+                  <button className="btn-soft px-3 py-2" type="button" onClick={() => onEdit(item)}>
+                    <Icon name="edit" />
+                    Edit
+                  </button>
                 </td>
               </tr>
             ))}
@@ -1481,7 +1537,9 @@ function ItemEditor({ columns, item, onCancel, onSave }) {
       <div className="mx-auto my-6 max-w-3xl rounded-lg bg-white p-4 shadow-2xl sm:p-6">
         <div className="mb-4 flex items-start justify-between gap-4">
           <div>
-            <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Itinerary Item</p>
+            <p className="inline-flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-teal-700">
+              <Icon name="calendar" /> Itinerary Item
+            </p>
             <h2 className="text-2xl font-black text-slate-950">Add or edit details</h2>
           </div>
           <button className="btn-soft px-3 py-2" onClick={onCancel}>Close</button>
@@ -1549,7 +1607,10 @@ function ItemEditor({ columns, item, onCancel, onSave }) {
           <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto] sm:items-center">
             <p className="text-sm font-semibold text-slate-500">Saved automatically after you press Save.</p>
             <button className="btn-soft" type="button" onClick={onCancel}>Cancel</button>
-            <button className="btn-primary" type="submit">Save</button>
+            <button className="btn-primary" type="submit">
+              <Icon name="edit" />
+              Save
+            </button>
           </div>
         </form>
       </div>

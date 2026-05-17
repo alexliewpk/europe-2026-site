@@ -3,6 +3,7 @@ const { useEffect, useMemo, useRef, useState } = React;
 const STORAGE_KEY = "travel-itinerary-v2";
 const EXPENSE_TYPES = ["Food", "Transport", "Ticket", "Shopping", "WC", "Snacks", "Convenient store", "Other"];
 const PAY_BY_OPTIONS = ["PK", "CY"];
+const COUNTRY_OPTIONS = ["Hungary", "Austria", "Czech Republic"];
 const CURRENCY_OPTIONS = ["MYR", "EUR", "HUF", "CZK"];
 const FALLBACK_RATES_TO_MYR = {
   MYR: 1,
@@ -204,6 +205,7 @@ function createEmptyExpense() {
   return {
     id: crypto.randomUUID(),
     date: "",
+    country: "Hungary",
     type: "Food",
     payBy: "PK",
     currency: "MYR",
@@ -214,15 +216,24 @@ function createEmptyExpense() {
   };
 }
 
+function inferCountryFromDate(date) {
+  if (["25 May", "26 May", "27 May", "28 May"].includes(date)) return "Hungary";
+  if (["29 May", "30 May"].includes(date)) return "Austria";
+  if (["31 May", "1 June", "2 June"].includes(date)) return "Czech Republic";
+  return "Hungary";
+}
+
 function normalizeExpense(expense) {
   const currency = expense?.currency || "MYR";
   const payBy = expense?.payBy || "PK";
+  const country = expense?.country || inferCountryFromDate(expense?.date);
   const rateToMyr = Number(expense?.rateToMyr || FALLBACK_RATES_TO_MYR[currency] || 1);
   const amount = Number(expense?.amount || 0);
   return {
     ...createEmptyExpense(),
     ...expense,
     id: expense?.id || crypto.randomUUID(),
+    country,
     payBy,
     currency,
     rateToMyr,
@@ -803,14 +814,16 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   const [editingExpenseId, setEditingExpenseId] = useState(null);
   const [ratesToMyr, setRatesToMyr] = useState(FALLBACK_RATES_TO_MYR);
   const [rateStatus, setRateStatus] = useState("Using backup rates");
+  const [countryFilter, setCountryFilter] = useState("all");
   const [dateFilter, setDateFilter] = useState("all");
   const [typeFilter, setTypeFilter] = useState("all");
   const [payFilter, setPayFilter] = useState("all");
   const filteredExpenses = expenses.filter((expense) => {
+    const matchesCountry = countryFilter === "all" || expense.country === countryFilter;
     const matchesDate = dateFilter === "all" || expense.date === dateFilter;
     const matchesType = typeFilter === "all" || expense.type === typeFilter;
     const matchesPay = payFilter === "all" || expense.payBy === payFilter;
-    return matchesDate && matchesType && matchesPay;
+    return matchesCountry && matchesDate && matchesType && matchesPay;
   });
   const total = filteredExpenses.reduce((sum, expense) => sum + expenseMyr(expense), 0);
   const byType = EXPENSE_TYPES.map((type) => ({
@@ -827,6 +840,12 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         .reduce((sum, expense) => sum + expenseMyr(expense), 0)
     }))
     .sort((a, b) => a.date.localeCompare(b.date));
+  const byCountry = COUNTRY_OPTIONS.map((country) => ({
+    country,
+    total: filteredExpenses
+      .filter((expense) => expense.country === country)
+      .reduce((sum, expense) => sum + expenseMyr(expense), 0)
+  })).filter((entry) => entry.total > 0);
   const byPay = PAY_BY_OPTIONS.map((payBy) => ({
     payBy,
     total: filteredExpenses
@@ -836,6 +855,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   const convertedDraftAmount = Number(draft.amount || 0) * Number(ratesToMyr[draft.currency] || 1);
 
   function clearExpenseFilters() {
+    setCountryFilter("all");
     setDateFilter("all");
     setTypeFilter("all");
     setPayFilter("all");
@@ -874,7 +894,11 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
   }, []);
 
   function updateDraft(field, value) {
-    setDraft((current) => ({ ...current, [field]: value }));
+    setDraft((current) => ({
+      ...current,
+      [field]: value,
+      ...(field === "date" ? { country: inferCountryFromDate(value) } : {})
+    }));
   }
 
   function addExpense(event) {
@@ -912,7 +936,7 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         <p className="text-sm font-bold uppercase tracking-wide text-teal-700">Expenses</p>
         <h2 className="mt-1 text-2xl font-black text-slate-950">Add trip expense</h2>
 
-        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto]" onSubmit={addExpense}>
+        <form className="mt-4 grid gap-3 md:grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_auto]" onSubmit={addExpense}>
           <label className="field-label">
             Date
             <select
@@ -923,6 +947,18 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
               <option value="">Choose date</option>
               {dateOptions.map((date) => (
                 <option key={date} value={date}>{date}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field-label">
+            Country
+            <select
+              className="field-input"
+              value={draft.country}
+              onChange={(event) => updateDraft("country", event.target.value)}
+            >
+              {COUNTRY_OPTIONS.map((country) => (
+                <option key={country} value={country}>{country}</option>
               ))}
             </select>
           </label>
@@ -975,10 +1011,10 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
           <button className="btn-primary self-end" type="submit">
             Add
           </button>
-          <p className="text-sm font-semibold text-slate-500 md:col-span-6">
+          <p className="text-sm font-semibold text-slate-500 md:col-span-7">
             MYR record: <span className="font-black text-slate-950">{money(convertedDraftAmount)}</span> · {rateStatus}
           </p>
-          <label className="field-label md:col-span-6">
+          <label className="field-label md:col-span-7">
             Notes
             <input
               className="field-input"
@@ -1023,6 +1059,8 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
       </div>
 
       <ExpensesFilterBar
+        countryFilter={countryFilter}
+        setCountryFilter={setCountryFilter}
         dateFilter={dateFilter}
         setDateFilter={setDateFilter}
         typeFilter={typeFilter}
@@ -1035,7 +1073,12 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
         onClear={clearExpenseFilters}
       />
 
-      <ExpenseGraph title="Expense Graph" data={byDate.length ? byDate : byType} />
+      <section className="grid gap-4 xl:grid-cols-2">
+        <ExpenseGraph title="By Country" data={byCountry} />
+        <ExpenseGraph title="By Date" data={byDate} />
+        <ExpenseGraph title="By Type" data={byType} />
+        <ExpenseGraph title="By People" data={byPay} />
+      </section>
 
       <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
         <p className="text-sm font-bold uppercase tracking-wide text-slate-500">By Date</p>
@@ -1071,6 +1114,8 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
 }
 
 function ExpensesFilterBar({
+  countryFilter,
+  setCountryFilter,
   dateFilter,
   setDateFilter,
   typeFilter,
@@ -1084,8 +1129,17 @@ function ExpensesFilterBar({
 }) {
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-soft">
-      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Filter</p>
-      <div className="mt-3 grid gap-3 md:grid-cols-[1fr_1fr_1fr_auto_auto] md:items-end">
+      <p className="text-sm font-bold uppercase tracking-wide text-slate-500">Filter by country, date, types, people</p>
+      <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-[1fr_1fr_1fr_1fr_auto_auto] xl:items-end">
+        <label className="field-label">
+          Country
+          <select className="field-input" value={countryFilter} onChange={(event) => setCountryFilter(event.target.value)}>
+            <option value="all">All countries</option>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country} value={country}>{country}</option>
+            ))}
+          </select>
+        </label>
         <label className="field-label">
           Date
           <select className="field-input" value={dateFilter} onChange={(event) => setDateFilter(event.target.value)}>
@@ -1096,7 +1150,7 @@ function ExpensesFilterBar({
           </select>
         </label>
         <label className="field-label">
-          Type
+          Types
           <select className="field-input" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
             <option value="all">All types</option>
             {EXPENSE_TYPES.map((type) => (
@@ -1105,7 +1159,7 @@ function ExpensesFilterBar({
           </select>
         </label>
         <label className="field-label">
-          Pay by
+          People
           <select className="field-input" value={payFilter} onChange={(event) => setPayFilter(event.target.value)}>
             <option value="all">All people</option>
             {PAY_BY_OPTIONS.map((payBy) => (
@@ -1132,7 +1186,7 @@ function ExpenseGraph({ title, data }) {
       <p className="text-sm font-bold uppercase tracking-wide text-slate-500">{title}</p>
       <div className="mt-4 grid gap-3">
         {data.length ? data.map((entry) => {
-          const label = entry.date || entry.type || entry.payBy;
+          const label = entry.country || entry.date || entry.type || entry.payBy;
           const width = maxTotal ? Math.max(8, (entry.total / maxTotal) * 100) : 0;
           return (
             <div key={label} className="grid gap-1">
@@ -1168,7 +1222,7 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave,
   if (isEditing) {
     return (
       <form
-        className="grid gap-3 rounded-lg border border-teal-200 bg-teal-50 p-3 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr]"
+        className="grid gap-3 rounded-lg border border-teal-200 bg-teal-50 p-3 lg:grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr]"
         onSubmit={(event) => {
           event.preventDefault();
           onSave(draft);
@@ -1180,6 +1234,14 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave,
             <option value="">Choose date</option>
             {dateOptions.map((date) => (
               <option key={date} value={date}>{date}</option>
+            ))}
+          </select>
+        </label>
+        <label className="field-label">
+          Country
+          <select className="field-input" value={draft.country} onChange={(event) => updateDraft("country", event.target.value)}>
+            {COUNTRY_OPTIONS.map((country) => (
+              <option key={country} value={country}>{country}</option>
             ))}
           </select>
         </label>
@@ -1216,7 +1278,7 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave,
             ))}
           </select>
         </label>
-        <label className="field-label lg:col-span-5">
+        <label className="field-label lg:col-span-6">
           Notes
           <input
             className="field-input"
@@ -1224,7 +1286,7 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave,
             onChange={(event) => updateDraft("notes", event.target.value)}
           />
         </label>
-        <div className="grid gap-2 sm:grid-cols-2 lg:col-span-5">
+        <div className="grid gap-2 sm:grid-cols-2 lg:col-span-6">
           <button className="btn-soft" type="button" onClick={onCancel}>Cancel</button>
           <button className="btn-primary" type="submit">Save</button>
         </div>
@@ -1233,8 +1295,9 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave,
   }
 
   return (
-    <div className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_auto] sm:items-center">
+    <div className="grid gap-2 rounded-lg border border-slate-200 p-3 sm:grid-cols-[1fr_1fr_1fr_1fr_1fr_1fr_auto] sm:items-center">
       <p className="font-black text-slate-950">{expense.date || "-"}</p>
+      <p className="font-bold text-slate-700">{expense.country || inferCountryFromDate(expense.date)}</p>
       <p className="font-bold text-teal-800">{expense.type || "-"}</p>
       <p className="font-bold text-slate-700">{expense.payBy || "PK"}</p>
       <p className="font-bold text-slate-700">{money(expense.amount, expense.currency)}</p>
@@ -1247,7 +1310,7 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave,
           Delete
         </button>
       </div>
-      {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-6">{expense.notes}</p>}
+      {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-7">{expense.notes}</p>}
     </div>
   );
 }

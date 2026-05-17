@@ -621,10 +621,6 @@ function App() {
     setEditingItem(null);
   }
 
-  function deleteItem(id) {
-    setItems((current) => current.filter((item) => item.id !== id));
-  }
-
   function addColumn(event) {
     event.preventDefault();
     const cleanName = columnName.trim();
@@ -758,7 +754,6 @@ function App() {
               items={filteredItems}
               isEditMode={isEditMode}
               onEdit={setEditingItem}
-              onDelete={deleteItem}
             />
 
             <ItineraryTable
@@ -766,7 +761,6 @@ function App() {
               items={filteredItems}
               isEditMode={isEditMode}
               onEdit={setEditingItem}
-              onDelete={deleteItem}
               onRemoveColumn={removeColumn}
             />
           </>
@@ -923,11 +917,6 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
     });
     setExpenses((current) => current.map((entry) => (entry.id === nextExpense.id ? nextExpense : entry)));
     setEditingExpenseId(null);
-  }
-
-  function deleteExpense(id) {
-    setExpenses((current) => current.filter((expense) => expense.id !== id));
-    if (editingExpenseId === id) setEditingExpenseId(null);
   }
 
   return (
@@ -1104,7 +1093,6 @@ function ExpensesPage({ expenses, setExpenses, dateOptions }) {
               onEdit={() => setEditingExpenseId(expense.id)}
               onCancel={() => setEditingExpenseId(null)}
               onSave={saveExpense}
-              onDelete={deleteExpense}
             />
           )) : <p className="text-base font-semibold text-slate-500">No expenses match this filter.</p>}
         </div>
@@ -1208,7 +1196,7 @@ function ExpenseGraph({ title, data }) {
   );
 }
 
-function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave, onDelete }) {
+function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave }) {
   const [draft, setDraft] = useState(() => normalizeExpense(expense));
 
   useEffect(() => {
@@ -1302,14 +1290,9 @@ function ExpenseRow({ expense, dateOptions, isEditing, onEdit, onCancel, onSave,
       <p className="font-bold text-slate-700">{expense.payBy || "PK"}</p>
       <p className="font-bold text-slate-700">{money(expense.amount, expense.currency)}</p>
       <p className="font-black text-slate-950">{money(expenseMyr(expense))}</p>
-      <div className="grid grid-cols-2 gap-2">
-        <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={onEdit}>
-          Edit
-        </button>
-        <button className="btn-danger px-3 py-2 text-sm" type="button" onClick={() => onDelete(expense.id)}>
-          Delete
-        </button>
-      </div>
+      <button className="btn-soft px-3 py-2 text-sm" type="button" onClick={onEdit}>
+        Edit
+      </button>
       {expense.notes && <p className="text-sm font-semibold text-slate-500 sm:col-span-7">{expense.notes}</p>}
     </div>
   );
@@ -1366,7 +1349,7 @@ function FilterBar({
   );
 }
 
-function ItineraryCards({ columns, items, isEditMode, onEdit, onDelete }) {
+function ItineraryCards({ columns, items, isEditMode, onEdit }) {
   return (
     <section className="grid gap-4 lg:hidden">
       {items.map((item) => (
@@ -1390,9 +1373,8 @@ function ItineraryCards({ columns, items, isEditMode, onEdit, onDelete }) {
           </div>
 
           {isEditMode && (
-            <div className="mt-4 grid grid-cols-2 gap-2">
+            <div className="mt-4 grid gap-2">
               <button className="btn-soft" onClick={() => onEdit(item)}>Edit</button>
-              <button className="btn-danger" onClick={() => onDelete(item.id)}>Delete</button>
             </div>
           )}
         </article>
@@ -1401,7 +1383,7 @@ function ItineraryCards({ columns, items, isEditMode, onEdit, onDelete }) {
   );
 }
 
-function ItineraryTable({ columns, items, isEditMode, onEdit, onDelete, onRemoveColumn }) {
+function ItineraryTable({ columns, items, isEditMode, onEdit, onRemoveColumn }) {
   return (
     <section className="hidden overflow-hidden rounded-lg border border-slate-200 bg-white shadow-soft lg:block">
       <div className="overflow-x-auto">
@@ -1445,7 +1427,6 @@ function ItineraryTable({ columns, items, isEditMode, onEdit, onDelete, onRemove
                   <td className="border-b border-slate-200 px-4 py-4">
                     <div className="flex gap-2">
                       <button className="btn-soft px-3 py-2" onClick={() => onEdit(item)}>Edit</button>
-                      <button className="btn-danger px-3 py-2" onClick={() => onDelete(item.id)}>Delete</button>
                     </div>
                   </td>
                 )}
